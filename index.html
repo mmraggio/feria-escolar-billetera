@@ -51,6 +51,7 @@
     }
 
     // === VARIABLES GLOBALES ===
+    const BANK_ID = "banco-central"; // ID fijo para el banco
     let rol = null;
     let userId = null;
     let userData = null;
@@ -61,14 +62,37 @@
     window.onload = () => {
       if (!db) return; // Si Firebase no se inicializó, no hacer nada
 
-      const savedId = localStorage.getItem("userId");
-      if (savedId) {
-        userId = savedId;
-        cargarUsuarioExistente();
-      } else {
-        mostrarFormulario();
-      }
+      // Crear banco si no existe
+      setupBanco().then(() => {
+        const savedId = localStorage.getItem("userId");
+        if (savedId) {
+          userId = savedId;
+          cargarUsuarioExistente();
+        } else {
+          mostrarFormulario();
+        }
+      }).catch(e => {
+        console.error("Error al crear banco:", e);
+        showMessage("Error al inicializar banco.", 'error');
+      });
     };
+
+    // === CREAR BANCO SI NO EXISTE ===
+    async function setupBanco() {
+      const bancoRef = db.collection("usuarios").doc(BANK_ID);
+      const doc = await bancoRef.get();
+
+      if (!doc.exists) {
+        await bancoRef.set({
+          nombre: "Banco Nacional",
+          rol: "banco",
+          saldo: 1000000, // Saldo inicial
+          qrId: BANK_ID,
+          createdAt: new Date()
+        });
+        console.log("Banco Nacional creado automáticamente.");
+      }
+    }
 
     function cargarUsuarioExistente() {
       db.collection("usuarios").doc(userId).get().then(doc => {
@@ -300,8 +324,9 @@
       const CURRENCY_SYMBOL = '$';
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+      // ✅ CORREGIDO: No mostrar saldo del negocio en la lista
       const negocioOptions = usuarios.length > 0
-        ? usuarios.map(n => `<option value="${n.id}">${n.nombre} - Saldo: ${CURRENCY_SYMBOL}${formatCurrency(n.saldo)}</option>`).join('')
+        ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
         : '<option value="">No hay negocios disponibles</option>';
 
       return `
@@ -389,6 +414,7 @@
 
       const senderRef = db.collection("usuarios").doc(userId);
       const receiverRef = db.collection("usuarios").doc(receiverId);
+      const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
       const transaccionRef = db.collection("transacciones").doc();
 
       try {
@@ -398,14 +424,17 @@
         await db.runTransaction(async (t) => {
           const senderDoc = await t.get(senderRef);
           const receiverDoc = await t.get(receiverRef);
+          const bancoDoc = await t.get(bancoRef); // Obtener banco
 
-          if (!senderDoc.exists || !receiverDoc.exists) throw "Usuario no encontrado";
+          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
 
           const newSenderBalance = senderDoc.data().saldo - amount;
           const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
+          const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
 
           t.update(senderRef, { saldo: newSenderBalance });
           t.update(receiverRef, { saldo: newReceiverBalance });
+          t.update(bancoRef, { saldo: newBancoBalance }); // Actualizar banco
           t.set(transaccionRef, {
             tipo: "venta",
             emisor: userId,
@@ -417,7 +446,7 @@
         });
 
         document.querySelector('#pago form').reset();
-        showMessage(`Pago de $${amount} exitoso.`, 'success');
+        showMessage(`✅ Pago de $${amount} exitoso.`, 'success');
         switchView('home');
       } catch (e) {
         console.error(e);
