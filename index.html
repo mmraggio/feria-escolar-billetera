@@ -91,8 +91,7 @@
 </div>
 
 <script>
-  // === 🔥 PON AQUÍ TUS CREDENCIALES DE FIREBASE (REEMPLAZA ESTE BLOQUE) ===
-  // Your web app's Firebase configuration
+  // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
   const firebaseConfig = {
     apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
     authDomain: "feria-escolar-billetera.firebaseapp.com",
@@ -108,6 +107,7 @@
   let userId = null;
   let userData = null;
 
+  // === CARGAR DATOS AL ABRIR ===
   window.onload = () => {
     const savedId = localStorage.getItem("userId");
     if (savedId) {
@@ -139,33 +139,42 @@
     document.getElementById("nombre-usuario").value = "";
   }
 
-  function iniciarUsuario() {
+  // === FUNCIÓN CORREGIDA PARA INICIAR USUARIO ===
+  async function iniciarUsuario() {
     const nombre = document.getElementById("nombre-usuario").value.trim();
     if (!nombre) return alert("Ingresa un nombre");
 
+    // Buscar un ID disponible (4 dígitos) de forma síncrona
     let nuevoId = null;
     let intentos = 0;
+
     while (nuevoId === null && intentos < 10000) {
       intentos++;
       const id = String(intentos).padStart(4, '0');
       const docRef = db.collection("usuarios").doc(id);
-      docRef.get().then(doc => {
-        if (!doc.exists) {
-          nuevoId = id;
-          docRef.set({
-            nombre,
-            rol,
-            saldo: rol === 'cliente' ? 500 : 0,
-            qrId: id,
-            createdAt: new Date()
-          }).then(() => {
-            localStorage.setItem("userId", id);
-            userId = id;
-            userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
-            cargarInterfaz();
-          });
-        }
-      });
+
+      const doc = await docRef.get();
+      if (!doc.exists) {
+        nuevoId = id;
+
+        await docRef.set({
+          nombre,
+          rol,
+          saldo: rol === 'cliente' ? 500 : 0,
+          qrId: id,
+          createdAt: new Date()
+        });
+
+        localStorage.setItem("userId", id);
+        userId = id;
+        userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+        cargarInterfaz();
+        break; // Salir del bucle una vez creado
+      }
+    }
+
+    if (!nuevoId) {
+      alert("No se pudo asignar un ID. Inténtalo de nuevo.");
     }
   }
 
@@ -203,6 +212,7 @@
     });
   }
 
+  // === GENERAR QR DE VENTA (Negocio) ===
   function generarQRVenta() {
     const monto = parseFloat(document.getElementById("monto-qr").value);
     if (!monto || monto <= 0) return alert("Monto inválido");
@@ -212,6 +222,7 @@
     new QRCode(document.getElementById("qrcode-venta"), data);
   }
 
+  // === ESCANEAR QR ===
   function startScanner() {
     const video = document.getElementById("video") || document.getElementById("video2");
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
@@ -249,10 +260,12 @@
       try {
         data = JSON.parse(dataStr);
       } catch {
+        // Si no es JSON, asumimos que es solo un ID para transferencia
         data = null;
       }
 
       if (data && data.tipo === "venta") {
+        // === ESCANEAR QR DE NEGOCIO ===
         const monto = data.monto;
         const negocioId = data.receptor;
 
@@ -299,7 +312,8 @@
         });
 
       } else {
-        const destinoId = dataStr;
+        // === ESCANEAR QR DE CLIENTE (Transferencia) ===
+        const destinoId = dataStr; // es solo el ID
         const monto = parseFloat(prompt("Monto a transferir:"));
         if (!monto || isNaN(monto) || monto <= 0) {
           stopStream(stream);
@@ -331,7 +345,7 @@
                 emisor: userId,
                 receptor: destinoId,
                 monto,
-                comision: 0,
+                comision: 0, // No hay comisión
                 fecha: new Date(),
               });
             });
@@ -364,10 +378,12 @@
     document.getElementById("video2").style.display = "none";
   }
 
+  // === PANEL BANCO ===
   function mostrarBanco() {
     document.getElementById("inicio").classList.add("hidden");
     document.getElementById("banco").classList.remove("hidden");
 
+    // Usuarios
     db.collection("usuarios").onSnapshot(snap => {
       const tabla = document.getElementById("tabla-usuarios");
       tabla.innerHTML = "<tr><th>ID</th><th>Nombre</th><th>Rol</th><th>Saldo</th></tr>";
@@ -377,6 +393,7 @@
       });
     });
 
+    // Transacciones
     db.collection("transacciones")
       .orderBy("fecha", "desc")
       .limit(50)
@@ -391,6 +408,7 @@
       });
   }
 
+  // === VOLVER ===
   function goBack() {
     document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
     document.getElementById("inicio").classList.remove("hidden");
