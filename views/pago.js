@@ -7,7 +7,7 @@ function getPagoView() {
     ? usuarios.map(n => `<option value="${n.id}">${n.nombre} (ID: ${n.id})</option>`).join('')
     : '<option value="">No hay negocios disponibles</option>';
 
-  // Botón de escanear QR es común
+  // Botón de escanear QR es común para todos
   const escanearButton = `
       <button type="button" onclick="switchView('escanear')" 
               class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
