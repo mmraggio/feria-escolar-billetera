@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <title>Billetera Feria Escolar</title>
   <!-- Carga de Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com  "></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
     .currency-display { font-variant-numeric: tabular-nums; }
@@ -20,8 +20,8 @@
   </div>
 
   <!-- Scripts de Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Librería QRCode.js -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -230,9 +230,12 @@
           case 'qr': // <-- CORREGIDO: Agregado el caso 'qr'
             content = getQRView();
             break;
+          case 'qrPago': // <-- Nuevo caso
+            content = getQRPagoView();
+            break;
           case 'transfer':
             content = getTransferView();
-            break; // Nueva vista
+            break;
           default:
             content = getNotFoundView();
             break;
@@ -265,9 +268,18 @@
     };
 
     window.switchView = (newView) => {
-      currentView = newView;
-      message = { text: '', type: '' };
-      renderApp();
+        if (newView === 'home' && window.tempPagoData) {
+            delete window.tempPagoData; // Limpiar datos temporales al ir a home
+        }
+        currentView = newView;
+        message = { text: '', type: '' };
+        renderApp();
+        if (newView === 'qr') {
+            setTimeout(updateQRView, 0);
+        }
+        if (newView === 'qrPago') {
+            setTimeout(updateQRPagoView, 0);
+        }
     };
 
     function getHomeView() {
@@ -346,7 +358,7 @@
           <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
         </div>
         
-        <form onsubmit="processPayment(event)" class="space-y-4">
+        <form id="pago-form" class="space-y-4">
           <div>
             <label for="negocio-select" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
             <select id="negocio-select" required
@@ -361,15 +373,20 @@
                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
           </div>
           
-          <button type="submit"
+          <button type="button" onclick="confirmarPago()" <!-- Cambiado type -->
                   class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
             Confirmar Pago
+          </button>
+          <!-- Nuevo Botón -->
+          <button type="button" onclick="generarQRPago()" <!-- Nuevo botón -->
+                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR para Pago
           </button>
         </form>
       `;
     }
 
-    // --- FUNCIÓN CORREGIDA getQRView ---
+    // --- FUNCIÓN ACTUALIZADA getQRView ---
     function getQRView() {
       // Crear el contenedor donde se generará el QR
       const qrContainerHtml = `<div id="qr-code-container" class="flex justify-center"></div>`;
@@ -384,42 +401,99 @@
           <h3 class="text-lg font-semibold">${userData?.nombre || 'Desconocido'}</h3>
           <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
           ${qrContainerHtml}
+          <div id="qr-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
           <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
-          <!-- Botón para ir a la vista de transferencia -->
-          <button onclick="switchView('transfer')"
-                  class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-            Recibir Dinero de Otro Usuario
-          </button>
         </div>
       `;
 
-      // Devolver el HTML base
       return html;
     }
 
-    // Función para generar el QR después de que se renderice la vista
-    function renderQRCode() {
-      const container = document.getElementById('qr-code-container');
-      if (container && userId) {
-        // Limpiar contenedor por si acaso
-        container.innerHTML = '';
-        // Generar QR con la librería
-        QRCode.toCanvas(container, userId, { width: 200 }, function (error) {
-          if (error) console.error('Error al generar QR:', error);
-          // console.log('QR generado correctamente!');
-        });
-      }
-    }
-
-    // --- FUNCIÓN PARA ACTUALIZAR LA VISTA QR ---
-    // Esta función se llama después de renderizar la vista 'qr'
+    // --- FUNCIÓN ACTUALIZADA updateQRView ---
     function updateQRView() {
       if (currentView === 'qr') {
-        // Usar setTimeout para asegurar que el DOM esté completamente renderizado
-        setTimeout(renderQRCode, 10);
+        const container = document.getElementById('qr-code-container');
+        const errorDiv = document.getElementById('qr-error-message');
+        if (container && userId) {
+            // Limpiar contenedor y ocultar mensaje de error
+            container.innerHTML = '';
+            errorDiv.classList.add('hidden');
+
+            // Generar QR con la librería
+            QRCode.toCanvas(container, userId, { width: 200 }, function (error) {
+              if (error) {
+                console.error('Error al generar QR:', error);
+                // Mostrar mensaje de error en la UI
+                errorDiv.classList.remove('hidden');
+              }
+              // console.log('QR generado correctamente!');
+            });
+        } else {
+             console.error('Contenedor QR o userId no encontrado en updateQRView');
+        }
       }
     }
 
+    // --- FUNCIÓN ACTUALIZADA getQRPagoView ---
+    function getQRPagoView() {
+        if (!window.tempPagoData) {
+            showMessage("Error: Datos de pago no encontrados.", 'error');
+            switchView('home');
+            return `
+                <div class="p-8 text-center">
+                    <h1 class="text-xl font-bold text-red-600">Error</h1>
+                    <p class="text-gray-600">Regresando al inicio...</p>
+                </div>
+            `;
+        }
+        const { receiverId, amount } = window.tempPagoData;
+        const negocio = usuarios.find(u => u.id === receiverId);
+        const nombreNegocio = negocio ? negocio.nombre : 'Desconocido';
+
+        const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center"></div>`;
+        const html = `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">QR de Pago</h1>
+        </div>
+        <div class="text-center p-4">
+          <h3 class="text-lg font-semibold">Pago a: ${nombreNegocio}</h3>
+          <p class="text-sm text-gray-500 mb-2">ID: ${receiverId}</p>
+          <p class="text-lg font-bold text-indigo-900">Monto: $${amount.toFixed(2)}</p>
+          ${qrContainerHtml}
+          <div id="qr-pago-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
+          <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagar.</p>
+          <button onclick="switchView('home')"
+                  class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+            Volver al Inicio
+          </button>
+        </div>
+      `;
+      return html;
+    }
+
+    // --- FUNCIÓN ACTUALIZADA updateQRPagoView ---
+    function updateQRPagoView() {
+      if (currentView === 'qrPago' && window.tempPagoData) {
+        const container = document.getElementById('qr-pago-container');
+        const errorDiv = document.getElementById('qr-pago-error-message');
+        if (container) {
+            container.innerHTML = ''; // Limpiar
+            errorDiv.classList.add('hidden'); // Ocultar error previo
+            const qrContent = `${window.tempPagoData.receiverId},${window.tempPagoData.amount}`;
+            QRCode.toCanvas(container, qrContent, { width: 200 }, function (error) {
+              if (error) {
+                console.error('Error al generar QR de pago:', error);
+                errorDiv.classList.remove('hidden'); // Mostrar error
+              }
+            });
+        } else {
+             console.error('Contenedor QR Pago o tempPagoData no encontrado en updateQRPagoView');
+        }
+      }
+    }
 
     function getTransferView() {
         return `
@@ -515,7 +589,7 @@
           });
         });
 
-        document.querySelector('#pago form').reset();
+        document.querySelector('#pago-form').reset(); // Resetear el formulario correcto
         showMessage(`✅ Pago de $${amount} exitoso.`, 'success');
         switchView('home');
       } catch (e) {
@@ -580,17 +654,25 @@
       }
     };
 
+    // Nueva función para generar QR de pago
+    window.generarQRPago = () => {
+        const receiverId = document.getElementById('negocio-select').value;
+        const amount = parseFloat(document.getElementById('monto-pago').value);
 
-    // --- ACTUALIZACIÓN: Llamar a updateQRView después de renderizar ---
-    // Observamos el cambio de vista para llamar a la función específica de QR
-    const originalSwitchView = window.switchView;
-    window.switchView = (newView) => {
-        originalSwitchView(newView);
-        // Si la nueva vista es 'qr', esperamos a que se renderice y generamos el código
-        if (newView === 'qr') {
-            // Usamos setTimeout para asegurar que el renderizado haya terminado
-            setTimeout(updateQRView, 0);
+        if (!receiverId || isNaN(amount) || amount <= 0) {
+            showMessage("Selecciona un negocio y un monto válido.", 'error');
+            return;
         }
+
+        // Guardar temporalmente los datos del pago
+        window.tempPagoData = { receiverId, amount };
+        switchView('qrPago');
+    };
+
+    // Función para confirmar pago directamente (opcional, si se desea mantener)
+    window.confirmarPago = () => {
+      // Llama a la función original de pago
+      processPayment(new Event('submit'));
     };
 
     // Iniciar renderizado
