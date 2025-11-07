@@ -3,7 +3,7 @@
 // --- FUNCIÓN ACTUALIZADA getQRView ---
 function getQRView() {
   // Crear el contenedor donde se generará el QR
-  // Usamos un div con un ID específico
+  // Usamos un div con un ID específico y un borde para visualizarlo
   const qrContainerHtml = `<div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
   const html = `
     <div class="flex items-center mb-6">
@@ -32,13 +32,23 @@ function updateQRView() {
     const errorDiv = document.getElementById('qr-error-message');
     
     if (container) {
-        container.innerHTML = ''; // Limpiar contenedor por si acaso
-        errorDiv.classList.add('hidden'); // Ocultar mensaje de error previo
+        // Limpiar el contenedor por si ya contenía un QR anterior
+        container.innerHTML = '';
+        // Ocultar mensaje de error previo
+        errorDiv.classList.add('hidden');
+
+        // Verificar si la librería QRCode está disponible
+        if (typeof QRCode === 'undefined') {
+            console.error('Librería QRCode no encontrada.');
+            errorDiv.textContent = 'Error: Librería QRCode no encontrada.';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
 
         try {
             // Generar QR con la nueva sintaxis de qrcode.js
             // El primer argumento es el contenedor DOM (o su ID como string)
-            // El segundo argumento es el texto a codificar (el ID del usuario)
+            // El segundo argumento es un objeto de opciones
             new QRCode(container, {
               text: userId, // Contenido: Solo el ID del usuario
               width: 200,   // Ancho del QR
@@ -51,7 +61,8 @@ function updateQRView() {
 
         } catch (error) {
             console.error('Error al generar QR de ID:', error);
-            errorDiv.classList.remove('hidden'); // Mostrar mensaje de error
+            errorDiv.textContent = 'Error al generar el QR.';
+            errorDiv.classList.remove('hidden');
         }
     } else {
         console.error('Contenedor QR (id: qr-code-container) no encontrado en updateQRView o userId no está definido.');
