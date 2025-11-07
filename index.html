@@ -23,6 +23,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
 
+  <!-- Librería QRCode.js -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
     const firebaseConfig = {
@@ -224,7 +227,7 @@
           case 'pago':
             content = getPagoView();
             break;
-          case 'qr':
+          case 'qr': // <-- CORREGIDO: Agregado el caso 'qr'
             content = getQRView();
             break;
           case 'transfer':
@@ -366,12 +369,11 @@
       `;
     }
 
+    // --- FUNCIÓN CORREGIDA getQRView ---
     function getQRView() {
-      const qrContainer = document.createElement("div");
-      new QRCode(qrContainer, userId); // ✅ QR con el ID del usuario
-      const qrCodeHtml = qrContainer.innerHTML;
-
-      return `
+      // Crear el contenedor donde se generará el QR
+      const qrContainerHtml = `<div id="qr-code-container" class="flex justify-center"></div>`;
+      const html = `
         <div class="flex items-center mb-6">
           <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -381,7 +383,7 @@
         <div class="text-center p-4">
           <h3 class="text-lg font-semibold">${userData?.nombre || 'Desconocido'}</h3>
           <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
-          <div class="flex justify-center">${qrCodeHtml}</div>
+          ${qrContainerHtml}
           <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
           <!-- Botón para ir a la vista de transferencia -->
           <button onclick="switchView('transfer')"
@@ -390,9 +392,35 @@
           </button>
         </div>
       `;
+
+      // Devolver el HTML base
+      return html;
     }
 
-    // Nueva vista para recibir dinero
+    // Función para generar el QR después de que se renderice la vista
+    function renderQRCode() {
+      const container = document.getElementById('qr-code-container');
+      if (container && userId) {
+        // Limpiar contenedor por si acaso
+        container.innerHTML = '';
+        // Generar QR con la librería
+        QRCode.toCanvas(container, userId, { width: 200 }, function (error) {
+          if (error) console.error('Error al generar QR:', error);
+          // console.log('QR generado correctamente!');
+        });
+      }
+    }
+
+    // --- FUNCIÓN PARA ACTUALIZAR LA VISTA QR ---
+    // Esta función se llama después de renderizar la vista 'qr'
+    function updateQRView() {
+      if (currentView === 'qr') {
+        // Usar setTimeout para asegurar que el DOM esté completamente renderizado
+        setTimeout(renderQRCode, 10);
+      }
+    }
+
+
     function getTransferView() {
         return `
         <div class="flex items-center mb-6">
@@ -553,11 +581,21 @@
     };
 
 
+    // --- ACTUALIZACIÓN: Llamar a updateQRView después de renderizar ---
+    // Observamos el cambio de vista para llamar a la función específica de QR
+    const originalSwitchView = window.switchView;
+    window.switchView = (newView) => {
+        originalSwitchView(newView);
+        // Si la nueva vista es 'qr', esperamos a que se renderice y generamos el código
+        if (newView === 'qr') {
+            // Usamos setTimeout para asegurar que el renderizado haya terminado
+            setTimeout(updateQRView, 0);
+        }
+    };
+
     // Iniciar renderizado
     if (db) renderApp();
   </script>
 
-  <!-- QRCode Lib -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js  "></script>
 </body>
 </html>
