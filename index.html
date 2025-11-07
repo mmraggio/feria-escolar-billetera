@@ -212,6 +212,10 @@
       if (currentView === 'escanear') {
         setTimeout(iniciarEscaneo, 0);
       }
+      // Cargar datos escaneados DESPUÉS de renderizar la vista de pago
+      if (currentView === 'pago') {
+          setTimeout(cargarDatosEscaneados, 0);
+      }
     };
 
     window.switchView = (newView) => {
