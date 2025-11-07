@@ -1,10 +1,16 @@
 // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
 function getHomeButtons() {
+    // Cambiamos el texto del primer botón según el rol
+    let firstButtonLabel = "Pagar a un Negocio";
+    if (rol === 'negocio') {
+        firstButtonLabel = "Generar Ticket de Pago";
+    }
+
     return `
         <div class="space-y-4">
           <button onclick="switchView('pago')"
                   class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
-            Pagar a un Negocio
+            ${firstButtonLabel}
           </button>
           <button onclick="switchView('qr')"
                   class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
