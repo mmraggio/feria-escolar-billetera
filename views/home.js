@@ -1,3 +1,5 @@
+// views/home.js
+
 // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
 function getHomeButtons() {
     // Definir botones comunes
