@@ -23,12 +23,11 @@ function getHomeButtons() {
         {
             texto: "Generar QR",
             icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('qrPago')" // Va a la vista específica para generar QR de cobro
+            onClick: "switchView('qrPago')" // <-- CAMBIADO: Ahora va directamente a la vista específica
         }
     ];
 
-    // Generar HTML para los botones en una cuadrícula de 3 columnas (2 filas)
-    // Asumiendo 4 botones, se distribuyen en 2 filas de 2 botones cada una para una mejor apariencia.
+    // Generar HTML para los botones en una cuadrícula de 2 columnas (2 filas)
     let html = '<div class="grid grid-cols-2 gap-4 max-w-xs mx-auto">'; // Cambiado a 2 columnas
     botonesComunes.forEach(boton => {
         html += `
