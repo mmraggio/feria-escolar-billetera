@@ -18,14 +18,17 @@ function getHomeButtons() {
             texto: "Transferir",
             icono: "swap_horiz", // Puedes usar un icono de texto o un SVG aquí
             onClick: "switchView('transfer')"
-        },
-        // Botón de Generar QR de Cobro para todos (la lógica interna verificará el rol)
-        {
+        }
+    ];
+
+    // Añadir botón de Generar QR de Cobro solo si es negocio
+    if (rol === 'negocio') {
+        botonesComunes.push({
             texto: "Generar QR",
             icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
             onClick: "switchView('qrPago')" // <-- CAMBIADO: Ahora va directamente a la vista específica
-        }
-    ];
+        });
+    }
 
     // Generar HTML para los botones en una cuadrícula de 2 columnas (2 filas)
     let html = '<div class="grid grid-cols-2 gap-4 max-w-xs mx-auto">'; // Cambiado a 2 columnas
