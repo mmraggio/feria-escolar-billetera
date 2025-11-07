@@ -1,28 +1,46 @@
 // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
 function getHomeButtons() {
-    // Cambiamos el texto del primer botón según el rol
-    let firstButtonLabel = "Pagar a un Negocio";
+    // Definir botones comunes
+    const botonesComunes = [
+        {
+            texto: "Mi QR",
+            icono: "qr_code", // Puedes usar un icono de texto o un SVG aquí
+            onClick: "switchView('qr')"
+        },
+        {
+            texto: "Pagar",
+            icono: "payment", // Puedes usar un icono de texto o un SVG aquí
+            onClick: "switchView('pago')"
+        },
+        {
+            texto: "Transferir",
+            icono: "swap_horiz", // Puedes usar un icono de texto o un SVG aquí
+            onClick: "switchView('transfer')"
+        }
+    ];
+
+    // Añadir botón específico para negocio
     if (rol === 'negocio') {
-        firstButtonLabel = "Generar Ticket de Pago";
+        botonesComunes.push({
+            texto: "Generar QR",
+            icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
+            onClick: "switchView('pago')" // Va a la vista de pago para generar
+        });
     }
 
-    return `
-        <div class="space-y-4">
-          <button onclick="switchView('pago')"
-                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
-            ${firstButtonLabel}
-          </button>
-          <button onclick="switchView('qr')"
-                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
-            Mi QR (Para recibir)
-          </button>
-          <!-- Botón de Transferencia entre Usuarios -->
-          <button onclick="switchView('transfer')"
-                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
-            Transferir a Usuario
-          </button>
-        </div>
-    `;
+    // Generar HTML para los botones en una cuadrícula de 3 columnas
+    let html = '<div class="grid grid-cols-3 gap-4">';
+    botonesComunes.forEach(boton => {
+        html += `
+        <button onclick="${boton.onClick}"
+                class="flex flex-col items-center justify-center p-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
+            <span class="text-2xl mb-2">${boton.icono}</span>
+            <span>${boton.texto}</span>
+        </button>
+        `;
+    });
+    html += '</div>';
+    return html;
 }
 
 function getHomeView() {
@@ -41,6 +59,6 @@ function getHomeView() {
       <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
     </div>
 
-    ${getHomeButtons()} <!-- Incluye los botones modularizados -->
+    ${getHomeButtons()} <!-- Incluye los botones en cuadrícula -->
   `;
 }
