@@ -16,6 +16,7 @@
     button, input { padding: 10px; margin: 10px 0; width: 100%; font-size: 16px; }
     button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
     button:hover { background: #0056b3; }
+    button:disabled { background: #cccccc; cursor: not-allowed; }
     .qr-container { margin: 20px 0; text-align: center; }
     #video { width: 100%; max-width: 300px; margin: 10px auto; display: block; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -39,7 +40,7 @@
 <div class="container hidden" id="formulario">
   <h3 id="titulo-form">Ingresa tu nombre</h3>
   <input type="text" id="nombre-usuario" placeholder="Ej: Juan - Hamburguesas" />
-  <button onclick="iniciarUsuario()">Guardar y Entrar</button>
+  <button id="btn-guardar" onclick="iniciarUsuario()">Guardar y Entrar</button>
   <button onclick="goBack()">← Volver</button>
 </div>
 
@@ -137,12 +138,22 @@
     document.getElementById("formulario").classList.remove("hidden");
     document.getElementById("titulo-form").textContent = rol === 'cliente' ? 'Ingresa tu nombre (Cliente)' : 'Nombre del Negocio';
     document.getElementById("nombre-usuario").value = "";
+    document.getElementById("btn-guardar").disabled = false;
   }
 
   // === FUNCIÓN CORREGIDA PARA INICIAR USUARIO ===
   async function iniciarUsuario() {
+    const btn = document.getElementById("btn-guardar");
+    btn.disabled = true;
+    btn.textContent = "Creando usuario...";
+
     const nombre = document.getElementById("nombre-usuario").value.trim();
-    if (!nombre) return alert("Ingresa un nombre");
+    if (!nombre) {
+      alert("Ingresa un nombre");
+      btn.disabled = false;
+      btn.textContent = "Guardar y Entrar";
+      return;
+    }
 
     // Buscar un ID disponible (4 dígitos) de forma síncrona
     let nuevoId = null;
@@ -153,28 +164,38 @@
       const id = String(intentos).padStart(4, '0');
       const docRef = db.collection("usuarios").doc(id);
 
-      const doc = await docRef.get();
-      if (!doc.exists) {
-        nuevoId = id;
+      try {
+        const doc = await docRef.get();
+        if (!doc.exists) {
+          nuevoId = id;
 
-        await docRef.set({
-          nombre,
-          rol,
-          saldo: rol === 'cliente' ? 500 : 0,
-          qrId: id,
-          createdAt: new Date()
-        });
+          await docRef.set({
+            nombre,
+            rol,
+            saldo: rol === 'cliente' ? 500 : 0,
+            qrId: id,
+            createdAt: new Date()
+          });
 
-        localStorage.setItem("userId", id);
-        userId = id;
-        userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
-        cargarInterfaz();
-        break; // Salir del bucle una vez creado
+          localStorage.setItem("userId", id);
+          userId = id;
+          userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+          cargarInterfaz();
+          break; // Salir del bucle una vez creado
+        }
+      } catch (e) {
+        console.error("Error al crear usuario:", e);
+        alert("Hubo un error al crear el usuario. Inténtalo de nuevo.");
+        btn.disabled = false;
+        btn.textContent = "Guardar y Entrar";
+        return;
       }
     }
 
     if (!nuevoId) {
       alert("No se pudo asignar un ID. Inténtalo de nuevo.");
+      btn.disabled = false;
+      btn.textContent = "Guardar y Entrar";
     }
   }
 
@@ -307,6 +328,7 @@
           mostrarResultado(`✅ Pagado: $${monto} (comisión: $${comision.toFixed(2)})`, "negocio");
           stopStream(stream);
         }).catch(e => {
+          console.error("Error en transacción:", e);
           mostrarResultado(`❌ Error: ${e}`, "negocio");
           stopStream(stream);
         });
@@ -354,6 +376,7 @@
           mostrarResultado(`✅ Transferido: $${monto}`, "negocio");
           stopStream(stream);
         }).catch(e => {
+          console.error("Error en transferencia:", e);
           mostrarResultado(`❌ Error: ${e}`, "negocio");
           stopStream(stream);
         });
