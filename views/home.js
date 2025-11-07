@@ -31,6 +31,7 @@ function getHomeButtons() {
     }
 
     // Generar HTML para los botones en una cuadrícula de 2 columnas (2 filas)
+    // Asumiendo 3 o 4 botones, se distribuyen en 2 filas de 2 botones cada una para una mejor apariencia.
     let html = '<div class="grid grid-cols-2 gap-4 max-w-xs mx-auto">'; // Cambiado a 2 columnas
     botonesComunes.forEach(boton => {
         html += `
@@ -41,6 +42,10 @@ function getHomeButtons() {
         </button>
         `;
     });
+    // Si hay un número impar de botones, añadir un div vacío para equilibrar la cuadrícula
+    if (botonesComunes.length % 2 === 1) {
+        html += '<div class="invisible"></div>'; // Div invisible para ocupar espacio
+    }
     html += '</div>';
     return html;
 }
