@@ -466,13 +466,17 @@
         console.log("Escaneo detenido.");
     }
 
-    // La función procesarCodigoQR permanece igual, solo cambia el mensaje de éxito
+    // --- FUNCIÓN ACTUALIZADA para procesar el código QR ---
     function procesarCodigoQR(code) {
+        // Detenemos la cámara inmediatamente para congelar la imagen en el estado de lectura
+        detenerEscaneo();
+
         // El formato esperado es "ID_NEGOCIO,MONTO"
         const parts = code.split(',');
         if (parts.length !== 2) {
             showMessage("Código QR inválido. No tiene el formato correcto.", 'error');
-            switchView('pago');
+            // Aseguramos que se haya detenido y damos un tiempo antes de volver
+            setTimeout(() => switchView('pago'), 2000); // Espera 2 segundos antes de volver
             return;
         }
 
@@ -482,7 +486,7 @@
         // Validar ID (4 dígitos)
         if (!/^\d{4}$/.test(negocioId)) {
             showMessage("Código QR inválido: ID de negocio incorrecto.", 'error');
-            switchView('pago');
+            setTimeout(() => switchView('pago'), 2000);
             return;
         }
 
@@ -490,7 +494,7 @@
         const monto = parseFloat(montoStr);
         if (isNaN(monto) || monto <= 0) {
             showMessage("Código QR inválido: Monto incorrecto.", 'error');
-            switchView('pago');
+            setTimeout(() => switchView('pago'), 2000);
             return;
         }
 
@@ -498,15 +502,19 @@
         const negocio = usuarios.find(u => u.id === negocioId);
         if (!negocio) {
             showMessage(`Negocio con ID ${negocioId} no encontrado.`, 'error');
-            switchView('pago');
+            setTimeout(() => switchView('pago'), 2000);
             return;
         }
 
         // Cargar datos en la vista de pago
         document.getElementById('negocio-select').value = negocioId;
         document.getElementById('monto-pago').value = monto.toFixed(2);
-        showMessage(`QR leído. Negocio: ${negocio.nombre}, Monto: $${monto.toFixed(2)}`, 'success');
-        switchView('pago');
+        // Mostramos el mensaje de éxito
+        showMessage(`✅ QR leído. Negocio: ${negocio.nombre}, Monto: $${monto.toFixed(2)}`, 'success');
+        // Esperamos un momento antes de cambiar de vista para que se vea el mensaje
+        setTimeout(() => {
+            switchView('pago');
+        }, 1500); // Espera 1.5 segundos antes de volver
     }
 
     window.switchView = (newView) => {
