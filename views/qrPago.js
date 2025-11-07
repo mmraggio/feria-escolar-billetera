@@ -2,9 +2,30 @@
 
 // --- FUNCIÓN ACTUALIZADA getQRPagoView ---
 function getQRPagoView() {
-    // No se necesita window.tempPagoData en esta vista, se genera dinámicamente
-    // Buscar el nombre del negocio que está generando el QR
-    const nombreNegocio = userData?.nombre || 'Negocio (ID Desconocido)';
+    // Verificar si el rol es 'negocio' al cargar la vista
+    if (userData?.rol !== 'negocio') {
+        // Mostrar un mensaje de error si no es negocio
+        return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+        </div>
+        <div class="text-center p-6">
+            <p class="text-red-500 font-bold text-lg">Acceso Denegado</p>
+            <p class="text-gray-700 mt-2">Solo los negocios pueden generar QR de cobro.</p>
+            <button onclick="switchView('home')"
+                    class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+              Volver al Inicio
+            </button>
+        </div>
+        `;
+    }
+
+    // Si es negocio, mostrar la interfaz normal
+    const nombreUsuario = userData?.nombre || 'Usuario (ID Desconocido)';
+    const rolUsuario = userData?.rol || 'Desconocido';
 
     // HTML para el formulario de generación de QR
     const qrFormHtml = `
@@ -32,9 +53,10 @@ function getQRPagoView() {
       <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
     </div>
 
-    <!-- Display de Saldo -->
+    <!-- Display de Saldo y Rol -->
     <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
-      <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
+      <p class="text-sm font-medium text-indigo-700">Tu Rol: ${rolUsuario}</p>
+      <p class="text-sm font-medium text-indigo-700">Tu Saldo:</p>
       <p class="text-2xl font-black text-indigo-900 currency-display">
         ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
       </p>
@@ -56,25 +78,28 @@ function getQRPagoView() {
 
 // --- Actualización de la vista QR de Pago ---
 function updateQRPagoView() {
-  // No es necesario hacer nada especial aquí, el QR se generará al hacer clic en el botón
-  // o al cargar si se guardó previamente (opcional)
-  // Si se quiere limpiar el QR al volver a la vista, se puede hacer aquí:
-  const container = document.getElementById('qr-pago-container');
-  const statusDiv = document.getElementById('qr-pago-status');
-  if (container) {
-      container.innerHTML = ''; // Limpiar
-      container.classList.add('hidden'); // Ocultar
-  }
-  if (statusDiv) {
-      statusDiv.textContent = ''; // Limpiar mensaje
+  // Limpiar el contenedor del QR y el mensaje de estado al cargar la vista
+  // Solo si es un negocio (para evitar errores si no lo es)
+  if (userData?.rol === 'negocio') {
+      const container = document.getElementById('qr-pago-container');
+      const statusDiv = document.getElementById('qr-pago-status');
+      if (container) {
+          container.innerHTML = ''; // Limpiar
+          container.classList.add('hidden'); // Ocultar
+      }
+      if (statusDiv) {
+          statusDiv.textContent = ''; // Limpiar mensaje
+          statusDiv.className = "text-center mt-2 text-sm"; // Resetear clase
+      }
   }
 }
 
 // --- Nueva función para generar QR desde el formulario ---
 function generarQRPagoDesdeFormulario() {
-    if (rol !== 'negocio') {
+    // Verificar si el rol es 'negocio' otra vez, por si acaso
+    if (userData?.rol !== 'negocio') {
         showMessage("Solo los negocios pueden generar QR de cobro.", 'error');
-        return;
+        return; // Salir si no es negocio
     }
 
     const amountInput = document.getElementById('monto-generar-qr').value;
@@ -89,7 +114,8 @@ function generarQRPagoDesdeFormulario() {
     const receiverId = userId;
 
     // Guardar temporalmente los datos del pago (el negocio como receptor)
-    window.tempPagoData = { receiverId, amount };
+    // Opcional: Podrías no necesitar tempPagoData aquí si generas el QR directamente
+    // window.tempPagoData = { receiverId, amount }; // Comentado si no se usa
 
     // Actualizar el mensaje de estado
     const statusDiv = document.getElementById('qr-pago-status');
@@ -111,7 +137,7 @@ function generarQRPagoDesdeFormulario() {
             try {
                 // Generar QR con la nueva sintaxis
                 new QRCode(container, {
-                  text: qrContent, // Contenido: ID_NEGOCIO,MONTO
+                  text: qrContent, // Contenido: ID_USUARIO,MONTO
                   width: 200,
                   height: 200,
                   colorDark: "#000000",
