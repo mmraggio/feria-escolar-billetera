@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Billetera Feria Escolar</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    button, input { padding: 10px; margin: 10px 0; width: 100%; font-size: 16px; }
+    button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .qr-container { margin: 20px 0; text-align: center; }
+    #video { width: 100%; max-width: 300px; margin: 10px auto; display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 10px; text-align: left; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- PANTALLA DE INICIO -->
+<div class="container" id="inicio">
+  <h2>Feria Escolar - Billetera Virtual</h2>
+  <p>¿Eres cliente o negocio?</p>
+  <button onclick="rol='cliente'; mostrarFormulario()">Soy Cliente</button>
+  <button onclick="rol='negocio'; mostrarFormulario()">Soy Negocio</button>
+  <button onclick="mostrarBanco()">Soy Banco (Profesor)</button>
+</div>
+
+<!-- FORMULARIO DE NOMBRE -->
+<div class="container hidden" id="formulario">
+  <h3 id="titulo-form">Ingresa tu nombre</h3>
+  <input type="text" id="nombre-usuario" placeholder="Ej: Juan - Hamburguesas" />
+  <button onclick="iniciarUsuario()">Guardar y Entrar</button>
+  <button onclick="goBack()">← Volver</button>
+</div>
+
+<!-- CLIENTE -->
+<div class="container hidden" id="cliente">
+  <h3><span id="nombre-cliente"></span> (ID: <span id="id-cliente"></span>)</h3>
+  <p>Saldo: $<span id="saldo-cliente">0</span></p>
+  <div class="qr-container">
+    <h4>Tu QR para recibir transferencias:</h4>
+    <div id="qr-mi-id"></div>
+  </div>
+  <button onclick="startScanner()">🔍 Escanear QR</button>
+  <video id="video" autoplay playsinline style="display:none"></video>
+  <div id="resultado-pago"></div>
+  <button onclick="goBack()">← Volver</button>
+</div>
+
+<!-- NEGOCIO -->
+<div class="container hidden" id="negocio">
+  <h3><span id="nombre-negocio"></span> (ID: <span id="id-negocio"></span>)</h3>
+  <p>Saldo: $<span id="saldo-negocio">0</span></p>
+  <div class="qr-container">
+    <h4>Tu QR para recibir transferencias:</h4>
+    <div id="qr-mi-id-negocio"></div>
+  </div>
+  <input type="number" id="monto-qr" placeholder="Monto a cobrar" />
+  <button onclick="generarQRVenta()">Generar QR de Venta</button>
+  <div class="qr-container" id="qrcode-venta"></div>
+  <button onclick="startScanner()">🔍 Escanear QR</button>
+  <video id="video2" autoplay playsinline style="display:none"></video>
+  <div id="resultado-pago-negocio"></div>
+  <button onclick="goBack()">← Volver</button>
+</div>
+
+<!-- BANCO -->
+<div class="container hidden" id="banco">
+  <h3>Banco (Profesor)</h3>
+  <h4>Usuarios</h4>
+  <table id="tabla-usuarios">
+    <tr><th>ID</th><th>Nombre</th><th>Rol</th><th>Saldo</th></tr>
+  </table>
+
+  <h4>Transacciones</h4>
+  <table id="tabla-transacciones">
+    <tr><th>De</th><th>A</th><th>Monto</th><th>Comisión</th><th>Fecha</th></tr>
+  </table>
+
+  <button onclick="goBack()">← Volver</button>
+</div>
+
+<script>
+  // === 🔥 PON AQUÍ TUS CREDENCIALES DE FIREBASE (REEMPLAZA ESTE BLOQUE) ===
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
+    authDomain: "feria-escolar-billetera.firebaseapp.com",
+    projectId: "feria-escolar-billetera",
+    storageBucket: "feria-escolar-billetera.firebasestorage.app",
+    messagingSenderId: "311026746803",
+    appId: "1:311026746803:web:fc891c988b9da3faee37c6"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  let rol = null;
+  let userId = null;
+  let userData = null;
+
+  window.onload = () => {
+    const savedId = localStorage.getItem("userId");
+    if (savedId) {
+      userId = savedId;
+      cargarUsuarioExistente();
+    } else {
+      document.getElementById("inicio").classList.remove("hidden");
+    }
+  };
+
+  function cargarUsuarioExistente() {
+    db.collection("usuarios").doc(userId).get().then(doc => {
+      if (doc.exists) {
+        userData = doc.data();
+        rol = userData.rol;
+        cargarInterfaz();
+      } else {
+        alert("Usuario no encontrado. Reinicia la app.");
+        localStorage.removeItem("userId");
+        goBack();
+      }
+    });
+  }
+
+  function mostrarFormulario() {
+    document.getElementById("inicio").classList.add("hidden");
+    document.getElementById("formulario").classList.remove("hidden");
+    document.getElementById("titulo-form").textContent = rol === 'cliente' ? 'Ingresa tu nombre (Cliente)' : 'Nombre del Negocio';
+    document.getElementById("nombre-usuario").value = "";
+  }
+
+  function iniciarUsuario() {
+    const nombre = document.getElementById("nombre-usuario").value.trim();
+    if (!nombre) return alert("Ingresa un nombre");
+
+    let nuevoId = null;
+    let intentos = 0;
+    while (nuevoId === null && intentos < 10000) {
+      intentos++;
+      const id = String(intentos).padStart(4, '0');
+      const docRef = db.collection("usuarios").doc(id);
+      docRef.get().then(doc => {
+        if (!doc.exists) {
+          nuevoId = id;
+          docRef.set({
+            nombre,
+            rol,
+            saldo: rol === 'cliente' ? 500 : 0,
+            qrId: id,
+            createdAt: new Date()
+          }).then(() => {
+            localStorage.setItem("userId", id);
+            userId = id;
+            userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+            cargarInterfaz();
+          });
+        }
+      });
+    }
+  }
+
+  function cargarInterfaz() {
+    document.getElementById("formulario").classList.add("hidden");
+
+    if (rol === 'cliente') {
+      document.getElementById("nombre-cliente").textContent = userData.nombre;
+      document.getElementById("id-cliente").textContent = userId;
+      document.getElementById("saldo-cliente").textContent = userData.saldo;
+      new QRCode(document.getElementById("qr-mi-id"), userId);
+      document.getElementById("cliente").classList.remove("hidden");
+      escucharCambiosCliente();
+    } else if (rol === 'negocio') {
+      document.getElementById("nombre-negocio").textContent = userData.nombre;
+      document.getElementById("id-negocio").textContent = userId;
+      document.getElementById("saldo-negocio").textContent = userData.saldo;
+      new QRCode(document.getElementById("qr-mi-id-negocio"), userId);
+      document.getElementById("negocio").classList.remove("hidden");
+      escucharCambiosNegocio();
+    }
+  }
+
+  function escucharCambiosCliente() {
+    db.collection("usuarios").doc(userId).onSnapshot(doc => {
+      userData = doc.data();
+      document.getElementById("saldo-cliente").textContent = userData.saldo;
+    });
+  }
+
+  function escucharCambiosNegocio() {
+    db.collection("usuarios").doc(userId).onSnapshot(doc => {
+      userData = doc.data();
+      document.getElementById("saldo-negocio").textContent = userData.saldo;
+    });
+  }
+
+  function generarQRVenta() {
+    const monto = parseFloat(document.getElementById("monto-qr").value);
+    if (!monto || monto <= 0) return alert("Monto inválido");
+
+    const data = JSON.stringify({ tipo: "venta", receptor: userId, monto, ts: Date.now() });
+    document.getElementById("qrcode-venta").innerHTML = "";
+    new QRCode(document.getElementById("qrcode-venta"), data);
+  }
+
+  function startScanner() {
+    const video = document.getElementById("video") || document.getElementById("video2");
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        video.srcObject = stream;
+        video.style.display = "block";
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const tick = () => {
+          if (video.readyState === video.HAVE_FUTURE_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+            if (code) {
+              procesarQR(code.data, stream);
+            } else {
+              requestAnimationFrame(tick);
+            }
+          } else {
+            setTimeout(tick, 100);
+          }
+        };
+        tick();
+      });
+  }
+
+  function procesarQR(dataStr, stream) {
+    try {
+      let data;
+      try {
+        data = JSON.parse(dataStr);
+      } catch {
+        data = null;
+      }
+
+      if (data && data.tipo === "venta") {
+        const monto = data.monto;
+        const negocioId = data.receptor;
+
+        if (userData.saldo < monto) {
+          mostrarResultado("❌ Saldo insuficiente", "negocio");
+          stopStream(stream);
+          return;
+        }
+
+        const comision = monto * 0.05;
+        const montoFinal = monto - comision;
+
+        const clienteRef = db.collection("usuarios").doc(userId);
+        const negocioRef = db.collection("usuarios").doc(negocioId);
+        const transaccionRef = db.collection("transacciones").doc();
+
+        db.runTransaction(t => {
+          return t.get(clienteRef).then(c => {
+            return t.get(negocioRef).then(n => {
+              if (!n.exists) throw "Negocio no encontrado";
+              if (n.data().rol !== 'negocio') throw "ID no es negocio";
+
+              const nuevoSaldoCliente = c.data().saldo - monto;
+              const nuevoSaldoNegocio = n.data().saldo + montoFinal;
+
+              t.update(clienteRef, { saldo: nuevoSaldoCliente });
+              t.update(negocioRef, { saldo: nuevoSaldoNegocio });
+              t.set(transaccionRef, {
+                tipo: "venta",
+                emisor: userId,
+                receptor: negocioId,
+                monto,
+                comision,
+                fecha: new Date(),
+              });
+            });
+          });
+        }).then(() => {
+          mostrarResultado(`✅ Pagado: $${monto} (comisión: $${comision.toFixed(2)})`, "negocio");
+          stopStream(stream);
+        }).catch(e => {
+          mostrarResultado(`❌ Error: ${e}`, "negocio");
+          stopStream(stream);
+        });
+
+      } else {
+        const destinoId = dataStr;
+        const monto = parseFloat(prompt("Monto a transferir:"));
+        if (!monto || isNaN(monto) || monto <= 0) {
+          stopStream(stream);
+          return;
+        }
+
+        if (userData.saldo < monto) {
+          mostrarResultado("❌ Saldo insuficiente", "negocio");
+          stopStream(stream);
+          return;
+        }
+
+        const emisorRef = db.collection("usuarios").doc(userId);
+        const receptorRef = db.collection("usuarios").doc(destinoId);
+        const transaccionRef = db.collection("transacciones").doc();
+
+        db.runTransaction(t => {
+          return t.get(emisorRef).then(e => {
+            return t.get(receptorRef).then(r => {
+              if (!r.exists) throw "Destinatario no encontrado";
+
+              const nuevoSaldoEmisor = e.data().saldo - monto;
+              const nuevoSaldoReceptor = r.data().saldo + monto;
+
+              t.update(emisorRef, { saldo: nuevoSaldoEmisor });
+              t.update(receptorRef, { saldo: nuevoSaldoReceptor });
+              t.set(transaccionRef, {
+                tipo: "transferencia",
+                emisor: userId,
+                receptor: destinoId,
+                monto,
+                comision: 0,
+                fecha: new Date(),
+              });
+            });
+          });
+        }).then(() => {
+          mostrarResultado(`✅ Transferido: $${monto}`, "negocio");
+          stopStream(stream);
+        }).catch(e => {
+          mostrarResultado(`❌ Error: ${e}`, "negocio");
+          stopStream(stream);
+        });
+      }
+    } catch (e) {
+      mostrarResultado("❌ QR inválido", "negocio");
+      stopStream(stream);
+    }
+  }
+
+  function mostrarResultado(texto, rol) {
+    if (rol === "negocio") {
+      document.getElementById("resultado-pago-negocio").innerHTML = `<p>${texto}</p>`;
+    } else {
+      document.getElementById("resultado-pago").innerHTML = `<p>${texto}</p>`;
+    }
+  }
+
+  function stopStream(stream) {
+    stream.getTracks().forEach(track => track.stop());
+    document.getElementById("video").style.display = "none";
+    document.getElementById("video2").style.display = "none";
+  }
+
+  function mostrarBanco() {
+    document.getElementById("inicio").classList.add("hidden");
+    document.getElementById("banco").classList.remove("hidden");
+
+    db.collection("usuarios").onSnapshot(snap => {
+      const tabla = document.getElementById("tabla-usuarios");
+      tabla.innerHTML = "<tr><th>ID</th><th>Nombre</th><th>Rol</th><th>Saldo</th></tr>";
+      snap.forEach(doc => {
+        const u = doc.data();
+        tabla.innerHTML += `<tr><td>${u.qrId}</td><td>${u.nombre}</td><td>${u.rol}</td><td>$${u.saldo}</td></tr>`;
+      });
+    });
+
+    db.collection("transacciones")
+      .orderBy("fecha", "desc")
+      .limit(50)
+      .onSnapshot(snap => {
+        const tabla = document.getElementById("tabla-transacciones");
+        tabla.innerHTML = "<tr><th>De</th><th>A</th><th>Monto</th><th>Comisión</th><th>Fecha</th></tr>";
+        snap.forEach(doc => {
+          const t = doc.data();
+          const fecha = t.fecha?.toDate().toLocaleString() || "-";
+          tabla.innerHTML += `<tr><td>${t.emisor}</td><td>${t.receptor}</td><td>$${t.monto}</td><td>$${t.comision}</td><td>${fecha}</td></tr>`;
+        });
+      });
+  }
+
+  function goBack() {
+    document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
+    document.getElementById("inicio").classList.remove("hidden");
+    document.getElementById("qrcode-venta").innerHTML = "";
+    document.getElementById("resultado-pago").innerHTML = "";
+    document.getElementById("resultado-pago-negocio").innerHTML = "";
+    userId = null;
+    userData = null;
+    rol = null;
+  }
+</script>
+</body>
+</html>
