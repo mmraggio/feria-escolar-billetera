@@ -65,27 +65,26 @@
     window.onload = () => {
       if (!db) return; // Si Firebase no se inicializó, no hacer nada
 
-      // Crear banco si no existe (inmediatamente, sin esperar autenticación)
-      setupBanco().then(() => {
-        // Autenticación anónima
-        firebase.auth().signInAnonymously()
-          .then(() => {
-            const savedId = localStorage.getItem("userId");
-            if (savedId) {
-              userId = savedId;
-              cargarUsuarioExistente();
-            } else {
-              mostrarFormulario();
-            }
-          })
-          .catch(e => {
-            console.error("Error en autenticación:", e);
-            showMessage("Error en autenticación.", 'error');
-          });
-      }).catch(e => {
-        console.error("Error al crear banco:", e);
-        showMessage("Error al inicializar banco.", 'error');
-      });
+      // Iniciar autenticación anónima
+      firebase.auth().signInAnonymously()
+        .then(() => {
+          // Una vez autenticado, crear banco si no existe
+          return setupBanco();
+        })
+        .then(() => {
+          // Luego de crear banco, continuar con la lógica normal
+          const savedId = localStorage.getItem("userId");
+          if (savedId) {
+            userId = savedId;
+            cargarUsuarioExistente();
+          } else {
+            mostrarFormulario();
+          }
+        })
+        .catch(e => {
+          console.error("Error en autenticación o creación de banco:", e);
+          showMessage("Error en autenticación o banco.", 'error');
+        });
     };
 
     // === CREAR BANCO SI NO EXISTE ===
