@@ -1,57 +1,28 @@
-// views/home.js
+// views/home.js (Versión antes de cuadrícula de iconos)
 
-// --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
 function getHomeButtons() {
-    // Definir botones comunes para todos los roles
-    const botonesComunes = [
-        {
-            texto: "Mi QR",
-            icono: "qr_code", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('qr')"
-        },
-        {
-            texto: "Pagar",
-            icono: "payment", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('pago')"
-        },
-        {
-            texto: "Transferir",
-            icono: "swap_horiz", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('transfer')"
-        }
-    ];
-
-    // Añadir botón de Generar QR de Cobro solo si es negocio
-    if (rol === 'negocio') {
-        botonesComunes.push({
-            texto: "Generar QR",
-            icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('qrPago')" // <-- CAMBIADO: Ahora va directamente a la vista específica
-        });
-    }
-
-    // Generar HTML para los botones en una cuadrícula de 2 columnas (2 filas)
-    // Asumiendo 3 o 4 botones, se distribuyen en 2 filas de 2 botones cada una para una mejor apariencia.
-    let html = '<div class="grid grid-cols-2 gap-4 max-w-xs mx-auto">'; // Cambiado a 2 columnas
-    botonesComunes.forEach(boton => {
-        html += `
-        <button onclick="${boton.onClick}"
-                class="flex flex-col items-center justify-center p-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
-            <span class="text-2xl mb-2">${boton.icono}</span>
-            <span>${boton.texto}</span>
-        </button>
-        `;
-    });
-    // Si hay un número impar de botones, añadir un div vacío para equilibrar la cuadrícula
-    if (botonesComunes.length % 2 === 1) {
-        html += '<div class="invisible"></div>'; // Div invisible para ocupar espacio
-    }
-    html += '</div>';
-    return html;
+    // Versión lineal original
+    return `
+        <div class="space-y-4">
+          <button onclick="switchView('pago')"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
+            Pagar a un Negocio
+          </button>
+          <button onclick="switchView('qr')"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
+            Mi QR (Para recibir)
+          </button>
+          <!-- Botón de Transferencia entre Usuarios -->
+          <button onclick="switchView('transfer')"
+                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
+            Transferir a Usuario
+          </button>
+        </div>
+    `;
 }
 
 function getHomeView() {
-  const formatCurrency = (value) => (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const CURRENCY_SYMBOL = '$';
 
   return `
@@ -66,6 +37,7 @@ function getHomeView() {
       <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
     </div>
 
-    ${getHomeButtons()} <!-- Incluye los botones en cuadrícula -->
+    ${getHomeButtons()} <!-- Incluye los botones lineales -->
+    <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
   `;
 }
