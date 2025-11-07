@@ -1,3 +1,5 @@
+// views/qrPago.js
+
 // --- FUNCIÓN ACTUALIZADA getQRPagoView ---
 function getQRPagoView() {
     // No se necesita window.tempPagoData en esta vista, se genera dinámicamente
