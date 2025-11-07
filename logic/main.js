@@ -33,6 +33,8 @@ let userId = null;
 let userData = null;
 let usuarios = []; // Lista de comercios para pagar
 let unsubscribeUsuarios = null;
+let unsubscribeTransacciones = null; // Nuevo: Para escuchar transacciones
+let ultimoPagoRecibido = null; // Para evitar notificaciones repetidas
 
 // === CARGAR DATOS AL ABRIR ===
 window.onload = () => {
@@ -77,6 +79,7 @@ function cargarUsuarioExistente() {
       rol = userData.rol;
       escucharCambios();
       escucharUsuarios();
+      escucharTransacciones(); // Iniciar escucha de transacciones
       switchView('home');
     } else {
       showMessage("Usuario no encontrado. Reinicia la app.", 'error');
@@ -143,6 +146,7 @@ async function iniciarUsuario() {
         userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
         escucharCambios();
         escucharUsuarios();
+        escucharTransacciones(); // Iniciar escucha de transacciones
         showMessage(`Usuario ${nombre} (${id}) creado como ${rol}.`, 'success');
         switchView('home');
         break; // Salir del bucle una vez creado
@@ -185,6 +189,48 @@ function escucharUsuarios() {
     });
     if (currentView === 'pago') renderApp();
   });
+}
+
+// --- ESCUCHAR TRANSACCIONES ---
+function escucharTransacciones() {
+  if (unsubscribeTransacciones) unsubscribeTransacciones();
+  // Escuchar solo transacciones donde el receptor es el usuario actual
+  unsubscribeTransacciones = db.collection("transacciones")
+    .where("receptor", "==", userId)
+    .orderBy("fecha", "desc") // Ordenar por fecha descendente
+    .limit(1) // Solo el último
+    .onSnapshot(snap => {
+      if (!snap.empty) {
+        const doc = snap.docs[0];
+        const transaccion = doc.data();
+        // Solo notificar si es un pago de negocio (tipo: "pago_negocio")
+        // y si es distinto al último que ya notifiqué
+        if (transaccion.tipo === "pago_negocio" && transaccion.id !== ultimoPagoRecibido?.id) {
+          ultimoPagoRecibido = transaccion;
+          // Actualizar userData para reflejar el nuevo saldo inmediatamente
+          userData.saldo = transaccion.monto_recibido + (userData.saldo - transaccion.monto_total); // Ajuste si es necesario
+          // Mostrar notificación si estamos en la vista home o qrPago
+          if (currentView === 'home' && rol === 'negocio') {
+            showMessage(`✅ Pago recibido de ${transaccion.emisor}: $${transaccion.monto_recibido.toFixed(2)}`, 'success');
+          }
+          if (currentView === 'qrPago') {
+            actualizarEstadoQRPago(transaccion.monto_recibido, transaccion.emisor); // Función nueva
+          }
+          console.log("Nuevo pago recibido:", transaccion);
+        }
+      }
+    });
+}
+
+// --- ACTUALIZAR ESTADO EN VISTA QR PAGO ---
+function actualizarEstadoQRPago(monto, emisorId) {
+  const statusDiv = document.getElementById('qr-pago-status');
+  if (statusDiv) {
+    // Buscar nombre del emisor
+    const emisor = usuarios.find(u => u.id === emisorId) || { nombre: 'Cliente (ID Desconocido)' };
+    statusDiv.textContent = `✅ Pago recibido de ${emisor.nombre}: $${monto.toFixed(2)}`;
+    statusDiv.className = "text-lg font-semibold text-green-600 mb-4"; // Cambiar color a verde
+  }
 }
 
 // --- CARGAR DATOS DESPUÉS DE RENDERIZAR PAGO ---
@@ -283,10 +329,10 @@ async function processPayment() {
 
     // Mensaje de éxito (ya se limpió el formulario antes de la transacción)
     showMessage(`✅ Pago de $${amount.toFixed(2)} realizado con éxito.`, 'success');
-    // Esperar un momento para que se vea el mensaje
+    // Esperar un momento corto para que se vea el mensaje
     setTimeout(() => {
         switchView('home');
-    }, 1500); // Espera 1.5 segundos antes de cambiar de vista
+    }, 1000); // Espera 1 segundo antes de cambiar de vista
 
   } catch (e) {
       console.error("Error en processPayment:", e);
@@ -374,12 +420,8 @@ function generarQRPago() {
 
     // Guardar temporalmente los datos del pago (el negocio como receptor)
     window.tempPagoData = { receiverId, amount };
-    // Mostrar mensaje de "listo para recibir" antes de generar el QR
-    showMessage(`✅ Listo para recibir $${amount.toFixed(2)}.`, 'success');
-    // Esperar un momento para que se vea el mensaje
-    setTimeout(() => {
-        switchView('qrPago');
-    }, 1500); // Espera 1.5 segundos antes de ir a la vista QR
+    // IR directamente a la vista QR sin mensaje previo
+    switchView('qrPago');
 }
 
 // Función para confirmar pago directamente
