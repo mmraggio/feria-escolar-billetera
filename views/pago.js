@@ -1,3 +1,4 @@
+// views/pago.js
 function getPagoView() {
   const CURRENCY_SYMBOL = '$';
   const formatCurrency = (value) => (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,16 +15,16 @@ function getPagoView() {
       </button>
   `;
 
-  // Botón de generar QR solo para negocio
-  let generarQRButton = '';
-  if (rol === 'negocio') {
-      generarQRButton = `
-          <button type="button" onclick="generarQRPago()" 
-                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-            Generar QR de Cobro
-          </button>
-      `;
-  }
+  // El botón de generar QR ya NO está aquí
+  // let generarQRButton = '';
+  // if (rol === 'negocio') {
+  //     generarQRButton = `
+  //         <button type="button" onclick="generarQRPago()" 
+  //                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+  //           Generar QR de Cobro
+  //         </button>
+  //     `;
+  // }
 
   return `
     <div class="flex items-center mb-6">
@@ -57,7 +58,7 @@ function getPagoView() {
         Pagar Ahora
       </button>
       ${escanearButton}
-      ${generarQRButton}
+      <!-- Botón Generar QR de Cobro REMOVIDO -->
     </form>
   `;
 }
