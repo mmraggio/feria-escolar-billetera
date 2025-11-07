@@ -214,7 +214,7 @@ function cargarDatosEscaneados() {
             showMessage("Error: Negocio no encontrado.", 'error');
         }
         // Limpiar datos temporales después de usarlos
-        delete window.tempScaneado;
+        delete window.tempScannedData;
     }
 }
 
@@ -225,8 +225,9 @@ function processPayment() {
   // No necesitamos el evento aquí
   
   const receiverId = document.getElementById('negocio-select').value;
-  const montoInput = document.getElementById('monto-pago').value;
-  const amount = parseFloat(montoInput);
+  const montoInput = document.getElementById('monto-pago');
+  const montoInputValue = montoInput.value; // Guardamos el valor antes de resetear
+  const amount = parseFloat(montoInputValue);
 
   if (!receiverId || isNaN(amount) || amount <= 0) {
     showMessage("Selecciona un negocio y un monto válido.", 'error');
@@ -242,54 +243,51 @@ function processPayment() {
   const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
   const transaccionRef = db.collection("transacciones").doc();
 
-  try {
-    // Solo los negocios (rol=negocio) pagan 5% de comisión al banco por recibir dinero
-    // Si el emisor es un cliente, no hay comisión de salida.
-    const comision = 0; // Comisión de salida eliminada para clientes
+  // Antes de la transacción, reseteamos el formulario para limpiar los campos
+  document.getElementById('pago-form').reset();
+  // Opcional: Limpiar también el select si es necesario, aunque mantenerlo puede ser útil
+  // document.getElementById('negocio-select').value = ''; 
 
-    db.runTransaction(async (t) => {
-      const senderDoc = await t.get(senderRef);
-      const receiverDoc = await t.get(receiverRef);
-      const bancoDoc = await t.get(bancoRef);
+  db.runTransaction(async (t) => {
+    const senderDoc = await t.get(senderRef);
+    const receiverDoc = await t.get(receiverRef);
+    const bancoDoc = await t.get(bancoRef);
 
-      if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
+    if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
 
-      // Cálculo de comisión que aplica al *receptor* si es un negocio
-      const isReceiverBusiness = receiverDoc.data().rol === 'negocio';
-      const comisionNegocio = isReceiverBusiness ? amount * 0.05 : 0;
-      const montoFinalNegocio = amount - comisionNegocio; // Lo que el negocio realmente recibe
+    // Cálculo de comisión que aplica al *receptor* si es un negocio
+    const isReceiverBusiness = receiverDoc.data().rol === 'negocio';
+    const comisionNegocio = isReceiverBusiness ? amount * 0.05 : 0;
+    const montoFinalNegocio = amount - comisionNegocio; // Lo que el negocio realmente recibe
 
-      // Actualizaciones
-      const newSenderBalance = senderDoc.data().saldo - amount;
-      const newReceiverBalance = receiverDoc.data().saldo + montoFinalNegocio;
-      const newBancoBalance = bancoDoc.data().saldo + comisionNegocio;
+    // Actualizaciones
+    const newSenderBalance = senderDoc.data().saldo - amount;
+    const newReceiverBalance = receiverDoc.data().saldo + montoFinalNegocio;
+    const newBancoBalance = bancoDoc.data().saldo + comisionNegocio;
 
-      t.update(senderRef, { saldo: newSenderBalance });
-      t.update(receiverRef, { saldo: newReceiverBalance });
-      t.update(bancoRef, { saldo: newBancoBalance }); 
+    t.update(senderRef, { saldo: newSenderBalance });
+    t.update(receiverRef, { saldo: newReceiverBalance });
+    t.update(bancoRef, { saldo: newBancoBalance }); 
 
-      t.set(transaccionRef, {
-        tipo: "pago_negocio",
-        emisor: userId,
-        receptor: receiverId,
-        monto_total: amount,
-        comision: comisionNegocio,
-        monto_recibido: montoFinalNegocio,
-        fecha: new Date(),
-      });
-    }).then(() => {
-        document.getElementById('pago-form').reset();
-        showMessage(`✅ Pago de $${amount.toFixed(2)} exitoso.`, 'success');
-        switchView('home');
-    }).catch(e => {
-        console.error("Error en processPayment:", e);
-        showMessage(`Error al procesar el pago.`, 'error');
+    t.set(transaccionRef, {
+      tipo: "pago_negocio",
+      emisor: userId,
+      receptor: receiverId,
+      monto_total: amount,
+      comision: comisionNegocio,
+      monto_recibido: montoFinalNegocio,
+      fecha: new Date(),
     });
-
-  } catch (e) {
-    console.error("Error en processPayment:", e);
-    showMessage(`Error al procesar el pago.`, 'error');
-  }
+  }).then(() => {
+      // Mensaje de éxito (ya se limpió el formulario antes de la transacción)
+      showMessage(`✅ Pago de $${amount.toFixed(2)} exitoso.`, 'success');
+      switchView('home');
+  }).catch(e => {
+      console.error("Error en processPayment:", e);
+      // Si la transacción falla, restauramos los valores originales en los campos (opcional)
+      // montoInput.value = montoInputValue; // Si no se reseteó antes
+      showMessage(`Error al procesar el pago.`, 'error');
+  });
 }
 
 // Nueva función para transferencia entre usuarios
