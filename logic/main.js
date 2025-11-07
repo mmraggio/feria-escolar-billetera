@@ -221,7 +221,7 @@ function cargarDatosEscaneados() {
 
 // --- FUNCIONES DE PROCESO ---
 
-function processPayment() {
+async function processPayment() {
   // No necesitamos el evento aquí
   
   const receiverId = document.getElementById('negocio-select').value;
@@ -248,46 +248,52 @@ function processPayment() {
   // Opcional: Limpiar también el select si es necesario, aunque mantenerlo puede ser útil
   // document.getElementById('negocio-select').value = ''; 
 
-  db.runTransaction(async (t) => {
-    const senderDoc = await t.get(senderRef);
-    const receiverDoc = await t.get(receiverRef);
-    const bancoDoc = await t.get(bancoRef);
+  try {
+    await db.runTransaction(async (t) => {
+      const senderDoc = await t.get(senderRef);
+      const receiverDoc = await t.get(receiverRef);
+      const bancoDoc = await t.get(bancoRef);
 
-    if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
+      if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
 
-    // Cálculo de comisión que aplica al *receptor* si es un negocio
-    const isReceiverBusiness = receiverDoc.data().rol === 'negocio';
-    const comisionNegocio = isReceiverBusiness ? amount * 0.05 : 0;
-    const montoFinalNegocio = amount - comisionNegocio; // Lo que el negocio realmente recibe
+      // Cálculo de comisión que aplica al *receptor* si es un negocio
+      const isReceiverBusiness = receiverDoc.data().rol === 'negocio';
+      const comisionNegocio = isReceiverBusiness ? amount * 0.05 : 0;
+      const montoFinalNegocio = amount - comisionNegocio; // Lo que el negocio realmente recibe
 
-    // Actualizaciones
-    const newSenderBalance = senderDoc.data().saldo - amount;
-    const newReceiverBalance = receiverDoc.data().saldo + montoFinalNegocio;
-    const newBancoBalance = bancoDoc.data().saldo + comisionNegocio;
+      // Actualizaciones
+      const newSenderBalance = senderDoc.data().saldo - amount;
+      const newReceiverBalance = receiverDoc.data().saldo + montoFinalNegocio;
+      const newBancoBalance = bancoDoc.data().saldo + comisionNegocio;
 
-    t.update(senderRef, { saldo: newSenderBalance });
-    t.update(receiverRef, { saldo: newReceiverBalance });
-    t.update(bancoRef, { saldo: newBancoBalance }); 
+      t.update(senderRef, { saldo: newSenderBalance });
+      t.update(receiverRef, { saldo: newReceiverBalance });
+      t.update(bancoRef, { saldo: newBancoBalance }); 
 
-    t.set(transaccionRef, {
-      tipo: "pago_negocio",
-      emisor: userId,
-      receptor: receiverId,
-      monto_total: amount,
-      comision: comisionNegocio,
-      monto_recibido: montoFinalNegocio,
-      fecha: new Date(),
+      t.set(transaccionRef, {
+        tipo: "pago_negocio",
+        emisor: userId,
+        receptor: receiverId,
+        monto_total: amount,
+        comision: comisionNegocio,
+        monto_recibido: montoFinalNegocio,
+        fecha: new Date(),
+      });
     });
-  }).then(() => {
-      // Mensaje de éxito (ya se limpió el formulario antes de la transacción)
-      showMessage(`✅ Pago de $${amount.toFixed(2)} exitoso.`, 'success');
-      switchView('home');
-  }).catch(e => {
+
+    // Mensaje de éxito (ya se limpió el formulario antes de la transacción)
+    showMessage(`✅ Pago de $${amount.toFixed(2)} realizado con éxito.`, 'success');
+    // Esperar un momento para que se vea el mensaje
+    setTimeout(() => {
+        switchView('home');
+    }, 1500); // Espera 1.5 segundos antes de cambiar de vista
+
+  } catch (e) {
       console.error("Error en processPayment:", e);
       // Si la transacción falla, restauramos los valores originales en los campos (opcional)
       // montoInput.value = montoInputValue; // Si no se reseteó antes
       showMessage(`Error al procesar el pago.`, 'error');
-  });
+  }
 }
 
 // Nueva función para transferencia entre usuarios
@@ -340,7 +346,10 @@ async function processTransfer(event) {
 
     document.getElementById('monto-transfer').value = '';
     showMessage(`✅ Transferencia de $${amount.toFixed(2)} a ${receiverId} exitosa.`, 'success');
-    switchView('home'); // <-- CAMBIADO: Ahora va a home
+    // Esperar un momento para que se vea el mensaje
+    setTimeout(() => {
+        switchView('home');
+    }, 1500); // Espera 1.5 segundos antes de cambiar de vista
   } catch (e) {
     const errorMsg = typeof e === 'string' ? e : "Error desconocido al transferir.";
     console.error("Error en processTransfer:", e);
@@ -365,7 +374,12 @@ function generarQRPago() {
 
     // Guardar temporalmente los datos del pago (el negocio como receptor)
     window.tempPagoData = { receiverId, amount };
-    switchView('qrPago'); // <-- CAMBIADO: Ahora va a qrPago
+    // Mostrar mensaje de "listo para recibir" antes de generar el QR
+    showMessage(`✅ Listo para recibir $${amount.toFixed(2)}.`, 'success');
+    // Esperar un momento para que se vea el mensaje
+    setTimeout(() => {
+        switchView('qrPago');
+    }, 1500); // Espera 1.5 segundos antes de ir a la vista QR
 }
 
 // Función para confirmar pago directamente
