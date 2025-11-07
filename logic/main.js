@@ -340,7 +340,7 @@ async function processTransfer(event) {
 
     document.getElementById('monto-transfer').value = '';
     showMessage(`✅ Transferencia de $${amount.toFixed(2)} a ${receiverId} exitosa.`, 'success');
-    switchView('home');
+    switchView('home'); // <-- CAMBIADO: Ahora va a home
   } catch (e) {
     const errorMsg = typeof e === 'string' ? e : "Error desconocido al transferir.";
     console.error("Error en processTransfer:", e);
@@ -365,7 +365,7 @@ function generarQRPago() {
 
     // Guardar temporalmente los datos del pago (el negocio como receptor)
     window.tempPagoData = { receiverId, amount };
-    switchView('qrPago');
+    switchView('qrPago'); // <-- CAMBIADO: Ahora va a qrPago
 }
 
 // Función para confirmar pago directamente
