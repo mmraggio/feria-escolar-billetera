@@ -1,19 +1,12 @@
-// views/pago.js
+// views/pago.js (Versión antes de cambios posteriores)
+
 function getPagoView() {
   const CURRENCY_SYMBOL = '$';
-  const formatCurrency = (value) => (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const negocioOptions = usuarios.length > 0
-    ? usuarios.map(n => `<option value="${n.id}">${n.nombre} (ID: ${n.id})</option>`).join('')
+    ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
     : '<option value="">No hay negocios disponibles</option>';
-
-  // Botón de escanear QR es común para todos los usuarios
-  const escanearButton = `
-      <button type="button" onclick="switchView('escanear')" 
-              class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-        Escanear QR de Negocio
-      </button>
-  `;
 
   return `
     <div class="flex items-center mb-6">
@@ -27,7 +20,7 @@ function getPagoView() {
       <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
     </div>
     
-    <form id="pago-form" class="space-y-4">
+    <form onsubmit="processPayment(event)" class="space-y-4">
       <div>
         <label for="negocio-select" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
         <select id="negocio-select" required
@@ -42,12 +35,10 @@ function getPagoView() {
                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
       </div>
       
-      <button type="button" onclick="confirmarPago()" 
+      <button type="submit"
               class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-        Pagar Ahora
+        Confirmar Pago
       </button>
-      ${escanearButton}
-      <!-- Botón Generar QR de Cobro REMOVIDO de aquí -->
     </form>
   `;
 }
