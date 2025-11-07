@@ -60,23 +60,45 @@
         background-color: black;
         color: white;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start; /* Ajustado para dejar espacio arriba */
+        padding-top: 1rem; /* Añadido padding superior */
     }
     #scanner-container video {
         width: 100%;
         max-width: 500px;
         height: auto;
         object-fit: cover;
+        border-radius: 0.5rem; /* Opcional: bordes redondeados */
+    }
+    #scanner-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 80%;
+        border: 2px solid #00ff00; /* Verde para el marco */
+        pointer-events: none;
     }
     #scanner-controls {
-        position: absolute;
-        bottom: 2rem;
+        position: relative; /* Cambiado de absolute a relative */
+        bottom: auto; /* Removido */
         width: 100%;
         display: flex;
         justify-content: center;
+        margin-top: 1rem; /* Espacio debajo del video */
     }
     #scanner-controls button {
         margin: 0 0.5rem;
+    }
+    #scanner-message {
+        margin-top: 1rem; /* Espacio debajo de los controles */
+        width: 100%;
+        text-align: center;
+    }
+    /* Canvas oculto */
+    #scanner-canvas {
+        display: none;
     }
   </style>
 </head>
@@ -93,8 +115,8 @@
   <!-- Librería QRCode.js -->
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
-  <!-- Librería QuaggaJS para escaneo -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <!-- Librería jsQR para escaneo -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
@@ -132,7 +154,6 @@
     let userData = null;
     let usuarios = []; // Lista de comercios para pagar
     let unsubscribeUsuarios = null;
-    let quaggaInitialized = false;
 
     // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
@@ -371,16 +392,142 @@
       if (document.getElementById('app-container')) renderApp();
     };
 
+    let scanningActive = false;
+    let videoStream = null;
+    let animationFrameId = null;
+
+    function iniciarEscaneo() {
+        const video = document.getElementById('scanner-video');
+        const canvasElement = document.getElementById('scanner-canvas');
+        const canvas = canvasElement.getContext('2d');
+        const messageDiv = document.getElementById('scanner-message');
+
+        if (!video) {
+            console.error("Elemento video no encontrado para escaneo.");
+            showMessage("Error al iniciar la cámara.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        scanningActive = true;
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => {
+            videoStream = stream;
+            video.srcObject = stream;
+            video.play();
+
+            // Función recursiva para escanear continuamente
+            function scan() {
+                if (!scanningActive) return; // Detener si la bandera cambia
+
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvasElement.width = video.videoWidth;
+                    canvasElement.height = video.videoHeight;
+                    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                    const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        console.log("Código QR detectado:", code.data);
+                        detenerEscaneo(); // Detiene la cámara y el bucle de escaneo
+                        procesarCodigoQR(code.data); // Procesa el código encontrado
+                        return; // Salir de la función scan
+                    }
+                }
+                // Solicitar el próximo frame de escaneo
+                animationFrameId = requestAnimationFrame(scan);
+            }
+
+            // Iniciar el bucle de escaneo
+            scan();
+
+        }).catch(err => {
+            console.error("Error al acceder a la cámara:", err);
+            messageDiv.textContent = `Error: ${err.message || 'No se pudo acceder a la cámara.'}`;
+            messageDiv.className = "text-center text-red-500 mt-4"; // Estilo de error
+            scanningActive = false; // Asegura que no se intente escanear
+        });
+    }
+
+    function detenerEscaneo() {
+        scanningActive = false; // Cambia la bandera para detener el bucle
+
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+
+        if (videoStream) {
+            const tracks = videoStream.getTracks();
+            tracks.forEach(track => track.stop());
+            videoStream = null;
+        }
+        console.log("Escaneo detenido.");
+    }
+
+    // La función procesarCodigoQR permanece igual, solo cambia el mensaje de éxito
+    function procesarCodigoQR(code) {
+        // El formato esperado es "ID_NEGOCIO,MONTO"
+        const parts = code.split(',');
+        if (parts.length !== 2) {
+            showMessage("Código QR inválido. No tiene el formato correcto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        const negocioId = parts[0].trim();
+        const montoStr = parts[1].trim();
+
+        // Validar ID (4 dígitos)
+        if (!/^\d{4}$/.test(negocioId)) {
+            showMessage("Código QR inválido: ID de negocio incorrecto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Validar Monto
+        const monto = parseFloat(montoStr);
+        if (isNaN(monto) || monto <= 0) {
+            showMessage("Código QR inválido: Monto incorrecto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Verificar si el negocio existe
+        const negocio = usuarios.find(u => u.id === negocioId);
+        if (!negocio) {
+            showMessage(`Negocio con ID ${negocioId} no encontrado.`, 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Cargar datos en la vista de pago
+        document.getElementById('negocio-select').value = negocioId;
+        document.getElementById('monto-pago').value = monto.toFixed(2);
+        showMessage(`QR leído. Negocio: ${negocio.nombre}, Monto: $${monto.toFixed(2)}`, 'success');
+        switchView('pago');
+    }
+
     window.switchView = (newView) => {
         if (newView === 'home' && window.tempPagoData) {
             delete window.tempPagoData; // Limpiar datos temporales al ir a home
         }
-        if (currentView === 'escanear') {
-            detenerEscaneo();
+        if (currentView === 'escanear') { // <-- ESTA PARTE ES CRUCIAL
+            detenerEscaneo(); // Detiene escaneo al salir
         }
         currentView = newView;
         message = { text: '', type: '' };
         renderApp();
+        if (currentView === 'qr') {
+            setTimeout(updateQRView, 0);
+        }
+        if (currentView === 'qrPago') {
+            setTimeout(updateQRPagoView, 0);
+        }
+        if (currentView === 'escanear') {
+            setTimeout(iniciarEscaneo, 0);
+        }
     };
 
     // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
@@ -671,150 +818,21 @@
         return `
         <div id="scanner-container">
             <h1 class="text-2xl font-bold text-white mb-6 text-center z-10">Escanear QR de Negocio</h1>
-            <div id="interactive" class="viewport w-full max-w-md mx-auto relative">
+            <div class="relative w-full max-w-md mx-auto">
                 <video id="scanner-video" autoplay playsinline muted style="width: 100%; height: auto; max-height: 70vh; object-fit: cover;"></video>
+                <div id="scanner-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 80%; border: 2px solid #00ff00; pointer-events: none;"></div>
             </div>
-            <div id="scanner-controls" class="z-10">
+            <div id="scanner-controls" class="z-10 mt-4">
                 <button onclick="switchView('pago')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">
                     Cancelar
                 </button>
             </div>
             <div id="scanner-message" class="text-center text-white mt-4"></div>
+            <!-- Canvas oculto para procesamiento de jsQR -->
+            <canvas id="scanner-canvas" style="display: none;"></canvas>
         </div>
         `;
     }
-
-    function iniciarEscaneo() {
-        if (quaggaInitialized) {
-            console.log("Quagga ya está inicializado.");
-            return;
-        }
-
-        const video = document.getElementById('scanner-video');
-        if (!video) {
-            console.error("Elemento video no encontrado para escaneo.");
-            showMessage("Error al iniciar la cámara.", 'error');
-            switchView('pago');
-            return;
-        }
-
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-        .then(stream => {
-            video.srcObject = stream;
-            video.play();
-
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#scanner-video'),
-                    constraints: {
-                        facingMode: "environment",
-                        width: 640,
-                        height: 480
-                    },
-                },
-                decoder: {
-                    readers: [
-                        "code_128_reader",
-                        "ean_reader",
-                        "ean_8_reader",
-                        "code_39_reader",
-                        "code_39_vin_reader",
-                        "codabar_reader",
-                        "upc_reader",
-                        "upc_e_reader",
-                        "i2of5_reader",
-                        "2of5_reader",
-                        "code_93_reader",
-                        "pdf417_reader",
-                        "qr_code_reader" // Habilitar lector QR
-                    ]
-                }
-            }, (err) => {
-                if (err) {
-                    console.error("Error al inicializar Quagga:", err);
-                    showMessage("Error al acceder a la cámara: " + err.message, 'error');
-                    switchView('pago');
-                    return;
-                }
-                Quagga.start();
-                quaggaInitialized = true;
-                console.log("Quagga inicializado y escaneo iniciado.");
-            });
-
-            Quagga.onDetected((data) => {
-                console.log("Código detectado:", data.codeResult.code);
-                detenerEscaneo();
-                procesarCodigoQR(data.codeResult.code);
-            });
-
-        }).catch(err => {
-            console.error("Error al acceder a la cámara:", err);
-            showMessage("No se pudo acceder a la cámara. Asegúrate de que esté permitida.", 'error');
-            switchView('pago');
-        });
-    }
-
-    function detenerEscaneo() {
-        if (quaggaInitialized) {
-            Quagga.stop();
-            quaggaInitialized = false;
-            console.log("Escaneo detenido.");
-        }
-        // Detener los tracks del stream de video
-        const video = document.getElementById('scanner-video');
-        if (video && video.srcObject) {
-            const stream = video.srcObject;
-            const tracks = stream.getTracks();
-            tracks.forEach(track => track.stop());
-            video.srcObject = null; // Limpiar la fuente del video
-        }
-    }
-
-    function procesarCodigoQR(code) {
-        // El formato esperado es "ID_NEGOCIO,MONTO"
-        const parts = code.split(',');
-        if (parts.length !== 2) {
-            showMessage("Código QR inválido. No tiene el formato correcto.", 'error');
-            switchView('pago');
-            return;
-        }
-
-        const negocioId = parts[0].trim();
-        const montoStr = parts[1].trim();
-
-        // Validar ID (4 dígitos)
-        if (!/^\d{4}$/.test(negocioId)) {
-            showMessage("Código QR inválido: ID de negocio incorrecto.", 'error');
-            switchView('pago');
-            return;
-        }
-
-        // Validar Monto
-        const monto = parseFloat(montoStr);
-        if (isNaN(monto) || monto <= 0) {
-            showMessage("Código QR inválido: Monto incorrecto.", 'error');
-            switchView('pago');
-            return;
-        }
-
-        // Verificar si el negocio existe
-        const negocio = usuarios.find(u => u.id === negocioId);
-        if (!negocio) {
-            showMessage(`Negocio con ID ${negocioId} no encontrado.`, 'error');
-            switchView('pago');
-            return;
-        }
-
-        // Cargar datos en la vista de pago o en una vista intermedia
-        // Opción 1: Cargar en la vista de pago y volver allí
-        document.getElementById('negocio-select').value = negocioId;
-        document.getElementById('monto-pago').value = monto.toFixed(2);
-        showMessage(`QR leído. Negocio: ${negocio.nombre}, Monto: $${monto.toFixed(2)}`, 'success');
-        switchView('pago');
-    }
-
 
     function getNotFoundView() {
       return `
