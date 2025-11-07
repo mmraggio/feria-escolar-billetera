@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <title>Billetera Feria Escolar</title>
   <!-- Carga de Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com  "></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
     .currency-display { font-variant-numeric: tabular-nums; }
@@ -20,8 +20,8 @@
   </div>
 
   <!-- Scripts de Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
 
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
@@ -182,7 +182,7 @@
       if (unsubscribeUsuarios) unsubscribeUsuarios();
       unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
         userData = doc.data();
-        if (currentView === 'home' || currentView === 'pago') renderApp();
+        if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer') renderApp();
       });
     }
 
@@ -227,6 +227,9 @@
           case 'qr':
             content = getQRView();
             break;
+          case 'transfer':
+            content = getTransferView();
+            break; // Nueva vista
           default:
             content = getNotFoundView();
             break;
@@ -287,7 +290,7 @@
           </button>
           <button onclick="switchView('qr')"
                   class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
-            Mostrar Mi QR
+            Mi QR <!-- ✅ CAMBIADO -->
           </button>
         </div>
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
@@ -324,7 +327,6 @@
       const CURRENCY_SYMBOL = '$';
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      // ✅ CORREGIDO: No mostrar saldo del negocio en la lista
       const negocioOptions = usuarios.length > 0
         ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
         : '<option value="">No hay negocios disponibles</option>';
@@ -366,7 +368,7 @@
 
     function getQRView() {
       const qrContainer = document.createElement("div");
-      new QRCode(qrContainer, userId);
+      new QRCode(qrContainer, userId); // ✅ QR con el ID del usuario
       const qrCodeHtml = qrContainer.innerHTML;
 
       return `
@@ -381,9 +383,49 @@
           <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
           <div class="flex justify-center">${qrCodeHtml}</div>
           <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
+          <!-- Botón para ir a la vista de transferencia -->
+          <button onclick="switchView('transfer')"
+                  class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+            Recibir Dinero de Otro Usuario
+          </button>
         </div>
       `;
     }
+
+    // Nueva vista para recibir dinero
+    function getTransferView() {
+        return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
+        </div>
+
+        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</span></p>
+        </div>
+
+        <form onsubmit="processTransfer(event)" class="space-y-4">
+          <div>
+            <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario</label>
+            <input type="text" id="destinatario-id" placeholder="0001" required pattern="^\d{4}$" maxlength="4"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <div>
+            <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
+            <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          
+          <button type="submit"
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Transferir Dinero (Sin Comisión)
+          </button>
+        </form>
+      `;
+    }
+
 
     function getNotFoundView() {
       return `
@@ -454,11 +496,68 @@
       }
     };
 
+    // Nueva función para transferencia entre usuarios
+    window.processTransfer = async (event) => {
+      event.preventDefault();
+      
+      const receiverId = document.getElementById('destinatario-id').value.trim();
+      const amount = parseFloat(document.getElementById('monto-transfer').value);
+
+      if (!receiverId || isNaN(amount) || amount <= 0) {
+        showMessage("Ingresa un ID y un monto válido.", 'error');
+        return;
+      }
+      if (receiverId === userId) {
+        showMessage("No puedes transferirte dinero a ti mismo.", 'error');
+        return;
+      }
+      if (amount > (userData?.saldo || 0)) {
+        showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
+        return;
+      }
+
+      const senderRef = db.collection("usuarios").doc(userId);
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+      const transaccionRef = db.collection("transacciones").doc();
+
+      try {
+        // No hay comisión para transferencias entre usuarios
+        await db.runTransaction(async (t) => {
+          const senderDoc = await t.get(senderRef);
+          const receiverDoc = await t.get(receiverRef);
+
+          if (!senderDoc.exists || !receiverDoc.exists) throw "Usuario no encontrado";
+
+          const newSenderBalance = senderDoc.data().saldo - amount;
+          const newReceiverBalance = receiverDoc.data().saldo + amount;
+
+          t.update(senderRef, { saldo: newSenderBalance });
+          t.update(receiverRef, { saldo: newReceiverBalance });
+          t.set(transaccionRef, {
+            tipo: "transferencia",
+            emisor: userId,
+            receptor: receiverId,
+            monto: amount,
+            comision: 0, // ✅ Sin comisión
+            fecha: new Date(),
+          });
+        });
+
+        document.querySelector('#transfer form').reset();
+        showMessage(`✅ Transferencia de $${amount} a ${receiverId} exitosa.`, 'success');
+        switchView('home');
+      } catch (e) {
+        console.error(e);
+        showMessage(`Error: ${e}`, 'error');
+      }
+    };
+
+
     // Iniciar renderizado
     if (db) renderApp();
   </script>
 
   <!-- QRCode Lib -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js  "></script>
 </body>
 </html>
