@@ -11,9 +11,7 @@
   <style>
     body { 
       font-family: 'Inter', sans-serif; 
-      /* Evita el desplazamiento del body */
       overflow: hidden; 
-      /* Asegura que el body ocupe toda la altura */
       height: 100vh; 
       margin: 0; 
       padding: 0; 
@@ -24,47 +22,66 @@
     #qr-pago-container > canvas {
         margin: 0 auto;
         display: block;
-        /* Opcional: Hacer el QR un poco más grande */
         width: 220px !important; 
         height: 220px !important;
     }
     /* Estilo para el contenedor de la app que ahora ocupa toda la pantalla */
     #app-container {
-        /* Elimina el ancho máximo y el padding externo */
-        max-width: none;
         width: 100%;
         height: 100vh;
         padding: 0;
         margin: 0;
-        /* Mantiene el estilo visual de antes */
         background-color: #f3f4f6; /* bg-gray-100 */
-        /* Asegura que el contenido se ajuste dentro del contenedor */
         display: flex;
         flex-direction: column;
-        justify-content: flex-start; /* Alinea contenido al inicio */
+        justify-content: flex-start;
         align-items: center;
-        overflow-y: auto; /* Permite desplazamiento si el contenido es mayor */
+        overflow-y: auto;
     }
     /* Estilo para el contenido interno de cada vista */
     .app-content {
-        /* Ajusta el ancho del contenido interno */
         width: 100%;
         max-width: 600px; /* Equivalente a max-w-lg */
         padding: 1rem; /* p-4 */
-        /* Mantiene el estilo de la tarjeta */
         background-color: white; /* bg-white */
         border-radius: 0.75rem; /* rounded-xl */
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* shadow-2xl */
         margin-top: 1rem; /* mt-4 */
         margin-bottom: 1rem; /* mb-4 */
-        /* Transiciones */
         transition: all 0.3s ease-in-out;
+    }
+    /* Estilos para la vista de escaneo */
+    #scanner-container {
+        width: 100%;
+        max-width: 600px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background-color: black;
+        color: white;
+        align-items: center;
+        justify-content: center;
+    }
+    #scanner-container video {
+        width: 100%;
+        max-width: 500px;
+        height: auto;
+        object-fit: cover;
+    }
+    #scanner-controls {
+        position: absolute;
+        bottom: 2rem;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+    #scanner-controls button {
+        margin: 0 0.5rem;
     }
   </style>
 </head>
-<body class="bg-gray-100"> <!-- Se removió min-h-screen, flex, items-center, justify-center, p-4 -->
+<body class="bg-gray-100">
 
-  <!-- Ahora el contenedor principal ocupa toda la pantalla -->
   <div id="app-container">
     <!-- Contenido de la aplicación -->
   </div>
@@ -75,6 +92,9 @@
 
   <!-- Librería QRCode.js -->
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+  <!-- Librería QuaggaJS para escaneo -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
@@ -112,6 +132,7 @@
     let userData = null;
     let usuarios = []; // Lista de comercios para pagar
     let unsubscribeUsuarios = null;
+    let quaggaInitialized = false;
 
     // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
@@ -158,7 +179,6 @@
           escucharUsuarios();
           switchView('home');
         } else {
-          // Usamos modal UI en lugar de alert
           showMessage("Usuario no encontrado. Reinicia la app.", 'error');
           localStorage.removeItem("userId");
           mostrarFormulario();
@@ -305,6 +325,9 @@
           case 'transfer':
             content = `<div class="app-content">${getTransferView()}</div>`;
             break;
+          case 'escanear':
+            content = getEscanearView(); // Vista sin app-content
+            break;
           default:
             content = `<div class="app-content">${getNotFoundView()}</div>`;
             break;
@@ -337,6 +360,9 @@
       if (currentView === 'qrPago') {
         setTimeout(updateQRPagoView, 0);
       }
+      if (currentView === 'escanear') {
+        setTimeout(iniciarEscaneo, 0);
+      }
     };
 
     const showMessage = (text, type) => {
@@ -348,6 +374,9 @@
     window.switchView = (newView) => {
         if (newView === 'home' && window.tempPagoData) {
             delete window.tempPagoData; // Limpiar datos temporales al ir a home
+        }
+        if (currentView === 'escanear') {
+            detenerEscaneo();
         }
         currentView = newView;
         message = { text: '', type: '' };
@@ -392,7 +421,6 @@
         </div>
 
         ${getHomeButtons()} <!-- Incluye los botones modularizados -->
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
     }
 
@@ -416,7 +444,6 @@
         <button id="btn-guardar" onclick="iniciarUsuario()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md mt-6">
           Guardar y Entrar
         </button>
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
     }
 
@@ -427,6 +454,24 @@
       const negocioOptions = usuarios.length > 0
         ? usuarios.map(n => `<option value="${n.id}">${n.nombre} (ID: ${n.id})</option>`).join('')
         : '<option value="">No hay negocios disponibles</option>';
+
+      // Mostrar botón de escanear solo si es cliente, y botón de generar QR solo si es negocio
+      let extraButtons = '';
+      if (rol === 'cliente') {
+          extraButtons = `
+              <button type="button" onclick="switchView('escanear')" 
+                      class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                Escanear QR de Negocio
+              </button>
+          `;
+      } else if (rol === 'negocio') {
+          extraButtons = `
+              <button type="button" onclick="generarQRPago()" 
+                      class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                Generar QR de Cobro (Cliente Escanea)
+              </button>
+          `;
+      }
 
       return `
         <div class="flex items-center mb-6">
@@ -448,7 +493,6 @@
               <option value="">-- Selecciona un negocio --</option>
               ${negocioOptions}
             </select>
-            <p id="app-message-pago-negocio" class="mt-2 text-sm text-red-500"></p>
           </div>
           <div>
             <label for="monto-pago" class="block text-sm font-medium text-gray-700">Monto (${CURRENCY_SYMBOL})</label>
@@ -460,12 +504,8 @@
                   class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
             Pagar Ahora
           </button>
-          <button type="button" onclick="generarQRPago()" 
-                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-            Generar QR de Cobro (Negocio Escanea)
-          </button>
+          ${extraButtons}
         </form>
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
     }
 
@@ -487,7 +527,6 @@
           <div id="qr-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
           <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
         </div>
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
 
       return html;
@@ -556,7 +595,6 @@
             Volver al Inicio
           </button>
         </div>
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
       return html;
     }
@@ -626,8 +664,155 @@
             Transferir Dinero
           </button>
         </form>
-        <!-- El mensaje ahora se renderiza fuera del app-content -->
       `;
+    }
+
+    function getEscanearView() {
+        return `
+        <div id="scanner-container">
+            <h1 class="text-2xl font-bold text-white mb-6 text-center z-10">Escanear QR de Negocio</h1>
+            <div id="interactive" class="viewport w-full max-w-md mx-auto relative">
+                <video id="scanner-video" autoplay playsinline muted style="width: 100%; height: auto; max-height: 70vh; object-fit: cover;"></video>
+            </div>
+            <div id="scanner-controls" class="z-10">
+                <button onclick="switchView('pago')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+                    Cancelar
+                </button>
+            </div>
+            <div id="scanner-message" class="text-center text-white mt-4"></div>
+        </div>
+        `;
+    }
+
+    function iniciarEscaneo() {
+        if (quaggaInitialized) {
+            console.log("Quagga ya está inicializado.");
+            return;
+        }
+
+        const video = document.getElementById('scanner-video');
+        if (!video) {
+            console.error("Elemento video no encontrado para escaneo.");
+            showMessage("Error al iniciar la cámara.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => {
+            video.srcObject = stream;
+            video.play();
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scanner-video'),
+                    constraints: {
+                        facingMode: "environment",
+                        width: 640,
+                        height: 480
+                    },
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader",
+                        "2of5_reader",
+                        "code_93_reader",
+                        "pdf417_reader",
+                        "qr_code_reader" // Habilitar lector QR
+                    ]
+                }
+            }, (err) => {
+                if (err) {
+                    console.error("Error al inicializar Quagga:", err);
+                    showMessage("Error al acceder a la cámara: " + err.message, 'error');
+                    switchView('pago');
+                    return;
+                }
+                Quagga.start();
+                quaggaInitialized = true;
+                console.log("Quagga inicializado y escaneo iniciado.");
+            });
+
+            Quagga.onDetected((data) => {
+                console.log("Código detectado:", data.codeResult.code);
+                detenerEscaneo();
+                procesarCodigoQR(data.codeResult.code);
+            });
+
+        }).catch(err => {
+            console.error("Error al acceder a la cámara:", err);
+            showMessage("No se pudo acceder a la cámara. Asegúrate de que esté permitida.", 'error');
+            switchView('pago');
+        });
+    }
+
+    function detenerEscaneo() {
+        if (quaggaInitialized) {
+            Quagga.stop();
+            quaggaInitialized = false;
+            console.log("Escaneo detenido.");
+        }
+        // Detener los tracks del stream de video
+        const video = document.getElementById('scanner-video');
+        if (video && video.srcObject) {
+            const stream = video.srcObject;
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.srcObject = null; // Limpiar la fuente del video
+        }
+    }
+
+    function procesarCodigoQR(code) {
+        // El formato esperado es "ID_NEGOCIO,MONTO"
+        const parts = code.split(',');
+        if (parts.length !== 2) {
+            showMessage("Código QR inválido. No tiene el formato correcto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        const negocioId = parts[0].trim();
+        const montoStr = parts[1].trim();
+
+        // Validar ID (4 dígitos)
+        if (!/^\d{4}$/.test(negocioId)) {
+            showMessage("Código QR inválido: ID de negocio incorrecto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Validar Monto
+        const monto = parseFloat(montoStr);
+        if (isNaN(monto) || monto <= 0) {
+            showMessage("Código QR inválido: Monto incorrecto.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Verificar si el negocio existe
+        const negocio = usuarios.find(u => u.id === negocioId);
+        if (!negocio) {
+            showMessage(`Negocio con ID ${negocioId} no encontrado.`, 'error');
+            switchView('pago');
+            return;
+        }
+
+        // Cargar datos en la vista de pago o en una vista intermedia
+        // Opción 1: Cargar en la vista de pago y volver allí
+        document.getElementById('negocio-select').value = negocioId;
+        document.getElementById('monto-pago').value = monto.toFixed(2);
+        showMessage(`QR leído. Negocio: ${negocio.nombre}, Monto: $${monto.toFixed(2)}`, 'success');
+        switchView('pago');
     }
 
 
@@ -768,18 +953,22 @@
       }
     };
 
-    // Nueva función para generar QR de pago
+    // Nueva función para generar QR de pago (solo para negocio)
     window.generarQRPago = () => {
-        const receiverId = document.getElementById('negocio-select').value;
-        const amount = parseFloat(document.getElementById('monto-pago').value);
-
-        if (!receiverId || isNaN(amount) || amount <= 0) {
-            showMessage("Selecciona un negocio y un monto válido.", 'error');
+        if (rol !== 'negocio') {
+            showMessage("Solo los negocios pueden generar QR de cobro.", 'error');
             return;
         }
-        // Nota: No se valida saldo aquí, ya que el QR es una solicitud de cobro del negocio.
+        const receiverId = userId; // El negocio es el receptor
+        const amountInput = document.getElementById('monto-pago').value;
+        const amount = parseFloat(amountInput);
 
-        // Guardar temporalmente los datos del pago
+        if (isNaN(amount) || amount <= 0) {
+            showMessage("Ingresa un monto válido para generar el cobro.", 'error');
+            return;
+        }
+
+        // Guardar temporalmente los datos del pago (el negocio como receptor)
         window.tempPagoData = { receiverId, amount };
         switchView('qrPago');
     };
