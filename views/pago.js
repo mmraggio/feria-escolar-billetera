@@ -6,20 +6,21 @@ function getPagoView() {
     ? usuarios.map(n => `<option value="${n.id}">${n.nombre} (ID: ${n.id})</option>`).join('')
     : '<option value="">No hay negocios disponibles</option>';
 
-  // Mostrar botón de escanear solo si es cliente, y botón de generar QR solo si es negocio
-  let extraButtons = '';
-  if (rol === 'cliente') {
-      extraButtons = `
-          <button type="button" onclick="switchView('escanear')" 
-                  class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-            Escanear QR de Negocio
-          </button>
-      `;
-  } else if (rol === 'negocio') {
-      extraButtons = `
+  // Botón de escanear QR es común
+  const escanearButton = `
+      <button type="button" onclick="switchView('escanear')" 
+              class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+        Escanear QR de Negocio
+      </button>
+  `;
+
+  // Botón de generar QR solo para negocio
+  let generarQRButton = '';
+  if (rol === 'negocio') {
+      generarQRButton = `
           <button type="button" onclick="generarQRPago()" 
                   class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-            Generar QR de Cobro (Cliente Escanea)
+            Generar QR de Cobro
           </button>
       `;
   }
@@ -55,7 +56,8 @@ function getPagoView() {
               class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
         Pagar Ahora
       </button>
-      ${extraButtons}
+      ${escanearButton}
+      ${generarQRButton}
     </form>
   `;
 }
