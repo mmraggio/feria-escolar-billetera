@@ -59,6 +59,7 @@
     let userData = null;
     let usuarios = []; // Lista de comercios para pagar
     let unsubscribeUsuarios = null;
+    const BANK_ID = "banco-central"; // ID fijo para el banco
 
     // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
@@ -67,19 +68,39 @@
       // Autenticación anónima
       firebase.auth().signInAnonymously()
         .then(() => {
-          const savedId = localStorage.getItem("userId");
-          if (savedId) {
-            userId = savedId;
-            cargarUsuarioExistente();
-          } else {
-            mostrarFormulario();
-          }
+          // Verificar si el banco existe, si no, crearlo
+          setupBanco().then(() => {
+            const savedId = localStorage.getItem("userId");
+            if (savedId) {
+              userId = savedId;
+              cargarUsuarioExistente();
+            } else {
+              mostrarFormulario();
+            }
+          });
         })
         .catch(e => {
           console.error("Error en autenticación:", e);
           showMessage("Error en autenticación.", 'error');
         });
     };
+
+    // === CREAR BANCO SI NO EXISTE ===
+    async function setupBanco() {
+      const bancoRef = db.collection("usuarios").doc(BANK_ID);
+      const doc = await bancoRef.get();
+
+      if (!doc.exists) {
+        await bancoRef.set({
+          nombre: "Banco Central de la Feria",
+          rol: "banco",
+          saldo: 1000000, // Saldo inicial
+          qrId: BANK_ID,
+          createdAt: new Date()
+        });
+        console.log("Banco creado automáticamente.");
+      }
+    }
 
     function cargarUsuarioExistente() {
       db.collection("usuarios").doc(userId).get().then(doc => {
@@ -482,23 +503,28 @@
 
       const senderRef = db.collection("usuarios").doc(userId);
       const receiverRef = db.collection("usuarios").doc(receiverId);
+      const bancoRef = db.collection("usuarios").doc(BANK_ID);
       const transaccionRef = db.collection("transacciones").doc();
 
       try {
+        // Calcular comisión (5% si el receptor es negocio)
         const comision = rol === 'negocio' ? amount * 0.05 : 0;
         const montoFinal = amount - comision;
 
         await db.runTransaction(async (t) => {
           const senderDoc = await t.get(senderRef);
           const receiverDoc = await t.get(receiverRef);
+          const bancoDoc = await t.get(bancoRef);
 
-          if (!senderDoc.exists || !receiverDoc.exists) throw "Usuario no encontrado";
+          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
 
           const newSenderBalance = senderDoc.data().saldo - amount;
           const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
+          const newBancoBalance = bancoDoc.data().saldo + comision;
 
           t.update(senderRef, { saldo: newSenderBalance });
           t.update(receiverRef, { saldo: newReceiverBalance });
+          t.update(bancoRef, { saldo: newBancoBalance }); // Sumar comisión al banco
           t.set(transaccionRef, {
             tipo: "venta",
             emisor: userId,
@@ -571,26 +597,31 @@
 
           const clienteRef = db.collection("usuarios").doc(userId);
           const negocioRef = db.collection("usuarios").doc(negocioId);
+          const bancoRef = db.collection("usuarios").doc(BANK_ID);
           const transaccionRef = db.collection("transacciones").doc();
 
           db.runTransaction(t => {
             return t.get(clienteRef).then(c => {
               return t.get(negocioRef).then(n => {
-                if (!n.exists) throw "Negocio no encontrado";
-                if (n.data().rol !== 'negocio') throw "ID no es negocio";
+                return t.get(bancoRef).then(b => {
+                  if (!n.exists || !b.exists) throw "Negocio o banco no encontrado";
+                  if (n.data().rol !== 'negocio') throw "ID no es negocio";
 
-                const nuevoSaldoCliente = c.data().saldo - monto;
-                const nuevoSaldoNegocio = n.data().saldo + montoFinal;
+                  const nuevoSaldoCliente = c.data().saldo - monto;
+                  const nuevoSaldoNegocio = n.data().saldo + montoFinal;
+                  const nuevoSaldoBanco = b.data().saldo + comision;
 
-                t.update(clienteRef, { saldo: nuevoSaldoCliente });
-                t.update(negocioRef, { saldo: nuevoSaldoNegocio });
-                t.set(transaccionRef, {
-                  tipo: "venta",
-                  emisor: userId,
-                  receptor: negocioId,
-                  monto,
-                  comision,
-                  fecha: new Date(),
+                  t.update(clienteRef, { saldo: nuevoSaldoCliente });
+                  t.update(negocioRef, { saldo: nuevoSaldoNegocio });
+                  t.update(bancoRef, { saldo: nuevoSaldoBanco }); // Sumar comisión al banco
+                  t.set(transaccionRef, {
+                    tipo: "venta",
+                    emisor: userId,
+                    receptor: negocioId,
+                    monto,
+                    comision,
+                    fecha: new Date(),
+                  });
                 });
               });
             });
