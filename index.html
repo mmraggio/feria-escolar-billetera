@@ -22,6 +22,7 @@
   <!-- Scripts de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
@@ -35,12 +36,14 @@
     };
 
     let db = null;
+    let auth = null;
     let app = null;
 
     // Inicializar Firebase
     try {
       app = firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
+      auth = firebase.auth();
     } catch (e) {
       console.error("Error al inicializar Firebase:", e);
       document.getElementById("app-container").innerHTML = `
@@ -61,13 +64,21 @@
     window.onload = () => {
       if (!db) return; // Si Firebase no se inicializó, no hacer nada
 
-      const savedId = localStorage.getItem("userId");
-      if (savedId) {
-        userId = savedId;
-        cargarUsuarioExistente();
-      } else {
-        mostrarFormulario();
-      }
+      // Autenticación anónima
+      firebase.auth().signInAnonymously()
+        .then(() => {
+          const savedId = localStorage.getItem("userId");
+          if (savedId) {
+            userId = savedId;
+            cargarUsuarioExistente();
+          } else {
+            mostrarFormulario();
+          }
+        })
+        .catch(e => {
+          console.error("Error en autenticación:", e);
+          showMessage("Error en autenticación.", 'error');
+        });
     };
 
     function cargarUsuarioExistente() {
@@ -158,7 +169,7 @@
       if (unsubscribeUsuarios) unsubscribeUsuarios();
       unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
         userData = doc.data();
-        if (currentView === 'home' || currentView === 'pago') renderApp();
+        if (currentView === 'home' || currentView === 'pago' || currentView === 'negocio-qr') renderApp();
       });
     }
 
@@ -202,6 +213,12 @@
             break;
           case 'qr':
             content = getQRView();
+            break;
+          case 'negocio-qr':
+            content = getNegocioQRView();
+            break;
+          case 'escanear':
+            content = getEscanearView();
             break;
           default:
             content = getNotFoundView();
@@ -265,6 +282,22 @@
                   class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
             Mostrar Mi QR
           </button>
+          ${userData?.rol === 'negocio' ? `
+            <button onclick="switchView('negocio-qr')"
+                    class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-yellow-500/50">
+              Generar QR de Venta
+            </button>
+            <button onclick="switchView('escanear')"
+                    class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-purple-500/50">
+              Escanear QR de Cliente
+            </button>
+          ` : ''}
+          ${userData?.rol === 'cliente' ? `
+            <button onclick="switchView('escanear')"
+                    class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-purple-500/50">
+              Escanear QR de Negocio
+            </button>
+          ` : ''}
         </div>
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
       `;
@@ -301,7 +334,7 @@
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       const negocioOptions = usuarios.length > 0
-        ? usuarios.map(n => `<option value="${n.id}">${n.nombre} - Saldo: ${CURRENCY_SYMBOL}${formatCurrency(n.saldo)}</option>`).join('')
+        ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
         : '<option value="">No hay negocios disponibles</option>';
 
       return `
@@ -360,6 +393,50 @@
       `;
     }
 
+    function getNegocioQRView() {
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Venta</h1>
+        </div>
+        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo || 0}</span></p>
+        </div>
+        <form onsubmit="generateVentaQR(event)" class="space-y-4">
+          <div>
+            <label for="monto-venta" class="block text-sm font-medium text-gray-700">Monto a cobrar (${CURRENCY_SYMBOL})</label>
+            <input type="number" id="monto-venta" placeholder="15.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          <button type="submit"
+                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR de Venta
+          </button>
+        </form>
+        <div id="qr-venta-container" class="mt-4"></div>
+      `;
+    }
+
+    function getEscanearView() {
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Escanear QR</h1>
+        </div>
+        <div id="video-container" class="mb-4">
+          <video id="video" autoplay playsinline style="width: 100%; max-width: 300px; margin: auto;"></video>
+        </div>
+        <div id="qr-result" class="mt-4 p-3 bg-gray-100 rounded-lg"></div>
+        <button onclick="startScanner()" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 mt-4">
+          Iniciar Cámara
+        </button>
+      `;
+    }
+
     function getNotFoundView() {
       return `
         <div class="text-center p-10">
@@ -372,6 +449,22 @@
       `;
     }
 
+    // === GENERAR QR DE VENTA (Negocio) ===
+    window.generateVentaQR = (event) => {
+      event.preventDefault();
+      const monto = parseFloat(document.getElementById('monto-venta').value);
+      if (!monto || monto <= 0) {
+        showMessage("Ingresa un monto válido.", 'error');
+        return;
+      }
+
+      const data = JSON.stringify({ tipo: "venta", receptor: userId, monto, ts: Date.now() });
+      const container = document.getElementById('qr-venta-container');
+      container.innerHTML = `<p class="text-center mb-2">Escanea este código para pagar $${monto}</p>`;
+      new QRCode(container, data);
+    };
+
+    // === PROCESAR PAGO (Cliente a Negocio) ===
     window.processPayment = async (event) => {
       event.preventDefault();
       
@@ -417,13 +510,111 @@
         });
 
         document.querySelector('#pago form').reset();
-        showMessage(`Pago de $${amount} exitoso.`, 'success');
-        switchView('home');
+        showMessage(`✅ Pago de $${amount} exitoso.`, 'success');
+        setTimeout(() => switchView('home'), 2000); // Volver a home después de 2 segundos
       } catch (e) {
         console.error(e);
         showMessage(`Error: ${e}`, 'error');
       }
     };
+
+    // === ESCANEAR QR ===
+    window.startScanner = async () => {
+      const video = document.getElementById("video");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+
+        const tick = () => {
+          if (video.readyState === video.HAVE_FUTURE_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+            if (code) {
+              procesarQR(code.data, stream);
+            } else {
+              requestAnimationFrame(tick);
+            }
+          } else {
+            setTimeout(tick, 100);
+          }
+        };
+        tick();
+      } catch (e) {
+        console.error("Error al acceder a la cámara:", e);
+        showMessage("No se pudo acceder a la cámara. Revisa los permisos.", 'error');
+      }
+    };
+
+    function procesarQR(dataStr, stream) {
+      try {
+        const data = JSON.parse(dataStr);
+
+        if (data.tipo === "venta") {
+          const monto = data.monto;
+          const negocioId = data.receptor;
+
+          if (userData.saldo < monto) {
+            showMessage("❌ Saldo insuficiente", 'error');
+            stopStream(stream);
+            return;
+          }
+
+          const comision = monto * 0.05;
+          const montoFinal = monto - comision;
+
+          const clienteRef = db.collection("usuarios").doc(userId);
+          const negocioRef = db.collection("usuarios").doc(negocioId);
+          const transaccionRef = db.collection("transacciones").doc();
+
+          db.runTransaction(t => {
+            return t.get(clienteRef).then(c => {
+              return t.get(negocioRef).then(n => {
+                if (!n.exists) throw "Negocio no encontrado";
+                if (n.data().rol !== 'negocio') throw "ID no es negocio";
+
+                const nuevoSaldoCliente = c.data().saldo - monto;
+                const nuevoSaldoNegocio = n.data().saldo + montoFinal;
+
+                t.update(clienteRef, { saldo: nuevoSaldoCliente });
+                t.update(negocioRef, { saldo: nuevoSaldoNegocio });
+                t.set(transaccionRef, {
+                  tipo: "venta",
+                  emisor: userId,
+                  receptor: negocioId,
+                  monto,
+                  comision,
+                  fecha: new Date(),
+                });
+              });
+            });
+          }).then(() => {
+            showMessage(`✅ Pagado: $${monto} (comisión: $${comision.toFixed(2)})`, 'success');
+            setTimeout(() => switchView('home'), 2000);
+            stopStream(stream);
+          }).catch(e => {
+            showMessage(`❌ Error: ${e}`, 'error');
+            stopStream(stream);
+          });
+        } else {
+          showMessage("❌ QR no válido", 'error');
+          stopStream(stream);
+        }
+      } catch (e) {
+        showMessage("❌ QR inválido", 'error');
+        stopStream(stream);
+      }
+    }
+
+    function stopStream(stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
 
     // Iniciar renderizado
     if (db) renderApp();
@@ -431,5 +622,6 @@
 
   <!-- QRCode Lib -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </body>
 </html>
