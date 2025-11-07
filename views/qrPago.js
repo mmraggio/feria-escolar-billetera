@@ -27,6 +27,11 @@ function getQRPagoView() {
     const nombreUsuario = userData?.nombre || 'Usuario (ID Desconocido)';
     const rolUsuario = userData?.rol || 'Desconocido';
 
+    // Contenedor para el QR generado (inicialmente vacío)
+    const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
+    // Contenedor para el mensaje de estado (inicialmente vacío)
+    const statusMessageHtml = `<div id="qr-pago-status" class="text-center mt-2 text-sm"></div>`;
+
     // HTML para el formulario de generación de QR
     const qrFormHtml = `
         <div class="mb-6">
@@ -40,11 +45,6 @@ function getQRPagoView() {
         </button>
     `;
 
-    // Contenedor para el QR generado (inicialmente vacío)
-    const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white mt-4 hidden"></div>`;
-    // Contenedor para el mensaje de estado (inicialmente vacío)
-    const statusMessageHtml = `<div id="qr-pago-status" class="text-center mt-2 text-sm"></div>`;
-
     const html = `
     <div class="flex items-center mb-6">
       <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
@@ -53,25 +53,15 @@ function getQRPagoView() {
       <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
     </div>
 
-    <!-- Display de Saldo y Rol -->
-    <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
-      <p class="text-sm font-medium text-indigo-700">Tu Rol: ${rolUsuario}</p>
-      <p class="text-sm font-medium text-indigo-700">Tu Saldo:</p>
-      <p class="text-2xl font-black text-indigo-900 currency-display">
-        ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
-      </p>
-      <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
-    </div>
-
-    <!-- Formulario para generar QR -->
-    <form id="generar-qr-form" class="space-y-4">
-      ${qrFormHtml}
-    </form>
-
     <!-- Contenedor del QR generado -->
     ${qrContainerHtml}
     <!-- Mensaje de estado -->
     ${statusMessageHtml}
+
+    <!-- Formulario para generar QR -->
+    <form id="generar-qr-form" class="space-y-4 mt-4">
+      ${qrFormHtml}
+    </form>
   `;
   return html;
 }
@@ -85,7 +75,7 @@ function updateQRPagoView() {
       const statusDiv = document.getElementById('qr-pago-status');
       if (container) {
           container.innerHTML = ''; // Limpiar
-          container.classList.add('hidden'); // Ocultar
+          // No ocultamos el contenedor aquí, lo mostramos vacío si no hay QR
       }
       if (statusDiv) {
           statusDiv.textContent = ''; // Limpiar mensaje
@@ -113,10 +103,6 @@ function generarQRPagoDesdeFormulario() {
     // El receptor es el propio negocio (userId)
     const receiverId = userId;
 
-    // Guardar temporalmente los datos del pago (el negocio como receptor)
-    // Opcional: Podrías no necesitar tempPagoData aquí si generas el QR directamente
-    // window.tempPagoData = { receiverId, amount }; // Comentado si no se usa
-
     // Actualizar el mensaje de estado
     const statusDiv = document.getElementById('qr-pago-status');
     if (statusDiv) {
@@ -130,7 +116,8 @@ function generarQRPagoDesdeFormulario() {
         const container = document.getElementById('qr-pago-container');
         if (container) {
             container.innerHTML = ''; // Limpiar por si acaso
-            container.classList.remove('hidden'); // Mostrar contenedor
+            // Mostrar contenedor (ya debería estar visible, pero por si acaso)
+            container.classList.remove('hidden');
 
             const qrContent = `${receiverId},${amount.toFixed(2)}`;
 
