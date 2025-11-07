@@ -11,6 +11,8 @@ function getQRPagoView() {
     const nombreNegocio = negocio.nombre;
 
     const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
+    // Mensaje dinámico
+    const statusMessageHtml = `<div id="qr-pago-status" class="text-lg font-semibold text-yellow-600 mb-4">Pendiente de pago...</div>`;
     const html = `
     <div class="flex items-center mb-6">
       <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
@@ -21,6 +23,7 @@ function getQRPagoView() {
     <div class="text-center p-4">
       <h3 class="text-xl font-semibold text-green-700">Monto: $${amount.toFixed(2)}</h3>
       <p class="text-sm text-gray-500 mb-2">Para: ${nombreNegocio} (ID: ${receiverId})</p>
+      ${statusMessageHtml}
       ${qrContainerHtml}
       <div id="qr-pago-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
       <p class="mt-4 text-sm text-gray-600">Este QR contiene el ID del Negocio y el monto. El cliente debe escanearlo para iniciar el pago.</p>
@@ -37,6 +40,7 @@ function getQRPagoView() {
 function updateQRPagoView() {
   if (currentView === 'qrPago' && window.tempPagoData) {
     const container = document.getElementById('qr-pago-container');
+    const statusDiv = document.getElementById('qr-pago-status'); // Nuevo div para estado
     const errorDiv = document.getElementById('qr-pago-error-message');
     
     if (container) {
@@ -56,10 +60,14 @@ function updateQRPagoView() {
               correctLevel: QRCode.CorrectLevel.H
             });
             console.log('QR de Pago generado correctamente.');
+            // Opcional: Cambiar mensaje a "Mostrar QR para recibir..."
+            // statusDiv.textContent = "Mostrar QR para recibir...";
 
         } catch (error) {
             console.error('Error al generar QR de pago:', error);
             errorDiv.classList.remove('hidden');
+            statusDiv.textContent = "Error al generar el QR."; // Actualizar estado
+            statusDiv.className = "text-lg font-semibold text-red-600 mb-4"; // Cambiar color
         }
     } else {
         console.error('Contenedor QR Pago o tempPagoData no encontrado.');
