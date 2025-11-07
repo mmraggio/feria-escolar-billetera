@@ -1,3 +1,5 @@
+// views/transfer.js (Versión antes de cambios posteriores)
+
 function getTransferView() {
     return `
     <div class="flex items-center mb-6">
@@ -16,7 +18,6 @@ function getTransferView() {
         <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario (4 dígitos)</label>
         <input type="text" id="destinatario-id" placeholder="Ej: 0045" required pattern="^\d{4}$" maxlength="4"
                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
-        <p class="text-xs text-gray-500 mt-1">El ID del destinatario se muestra en su pantalla de inicio.</p>
       </div>
       <div>
         <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
@@ -26,7 +27,7 @@ function getTransferView() {
       
       <button type="submit"
               class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-        Transferir Dinero
+        Transferir Dinero (Sin Comisión)
       </button>
     </form>
   `;
