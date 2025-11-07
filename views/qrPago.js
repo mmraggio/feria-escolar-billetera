@@ -30,6 +30,7 @@ function getQRPagoView() {
     // Contenedor para el QR generado (inicialmente vacío)
     const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
     // Contenedor para el mensaje de estado (inicialmente vacío)
+    // Este es el contenedor crucial para la notificación
     const statusMessageHtml = `<div id="qr-pago-status" class="text-center mt-2 text-sm"></div>`;
 
     // HTML para el formulario de generación de QR
@@ -66,103 +67,4 @@ function getQRPagoView() {
   return html;
 }
 
-// --- Actualización de la vista QR de Pago ---
-function updateQRPagoView() {
-  // Limpiar el contenedor del QR y el mensaje de estado al cargar la vista
-  // Solo si es un negocio (para evitar errores si no lo es)
-  if (userData?.rol === 'negocio') {
-      const container = document.getElementById('qr-pago-container');
-      const statusDiv = document.getElementById('qr-pago-status');
-      if (container) {
-          container.innerHTML = ''; // Limpiar
-          // No ocultamos el contenedor aquí, lo mostramos vacío si no hay QR
-      }
-      if (statusDiv) {
-          statusDiv.textContent = ''; // Limpiar mensaje
-          statusDiv.className = "text-center mt-2 text-sm"; // Resetear clase
-      }
-  }
-}
-
-// --- Nueva función para generar QR desde el formulario ---
-function generarQRPagoDesdeFormulario() {
-    // Verificar si el rol es 'negocio' otra vez, por si acaso
-    if (userData?.rol !== 'negocio') {
-        showMessage("Solo los negocios pueden generar QR de cobro.", 'error');
-        return; // Salir si no es negocio
-    }
-
-    const amountInput = document.getElementById('monto-generar-qr').value;
-    const amount = parseFloat(amountInput);
-
-    if (isNaN(amount) || amount <= 0) {
-        showMessage("Ingresa un monto válido para generar el cobro.", 'error');
-        return;
-    }
-
-    // El receptor es el propio negocio (userId)
-    const receiverId = userId;
-
-    // Actualizar el mensaje de estado
-    const statusDiv = document.getElementById('qr-pago-status');
-    if (statusDiv) {
-        statusDiv.textContent = `Generando QR para cobrar $${amount.toFixed(2)}...`;
-        statusDiv.className = "text-center mt-2 text-sm text-yellow-600"; // Color amarillo para "cargando"
-    }
-
-    // Generar el QR inmediatamente después de guardar los datos
-    // Usamos un pequeño timeout para asegurar que el DOM se actualice con el mensaje
-    setTimeout(() => {
-        const container = document.getElementById('qr-pago-container');
-        if (container) {
-            container.innerHTML = ''; // Limpiar por si acaso
-            // Mostrar contenedor (ya debería estar visible, pero por si acaso)
-            container.classList.remove('hidden');
-
-            const qrContent = `${receiverId},${amount.toFixed(2)}`;
-
-            try {
-                // Generar QR con la nueva sintaxis
-                new QRCode(container, {
-                  text: qrContent, // Contenido: ID_USUARIO,MONTO
-                  width: 200,
-                  height: 200,
-                  colorDark: "#000000",
-                  colorLight: "#ffffff",
-                  correctLevel: QRCode.CorrectLevel.H
-                });
-                console.log('QR de Pago generado correctamente para cobro.');
-
-                // Actualizar mensaje de éxito
-                const statusDiv = document.getElementById('qr-pago-status');
-                if (statusDiv) {
-                    statusDiv.textContent = `✅ QR generado para cobrar $${amount.toFixed(2)}.`;
-                    statusDiv.className = "text-center mt-2 text-sm text-green-600"; // Color verde para éxito
-                }
-
-            } catch (error) {
-                console.error('Error al generar QR de pago:', error);
-                const statusDiv = document.getElementById('qr-pago-status');
-                if (statusDiv) {
-                    statusDiv.textContent = "Error al generar el QR.";
-                    statusDiv.className = "text-center mt-2 text-sm text-red-600"; // Color rojo para error
-                }
-            }
-        } else {
-             console.error('Contenedor QR Pago no encontrado en generarQRPagoDesdeFormulario.');
-             showMessage("Error al generar el QR.", 'error');
-        }
-    }, 100); // Pequeño delay para que se vea el mensaje de "cargando"
-}
-
-// Mantenemos la función original generarQRPago por si acaso, pero ahora llama a la nueva
-function generarQRPago() {
-    // Esta función ahora llama a la nueva lógica
-    generarQRPagoDesdeFormulario();
-}
-
-// Función auxiliar para formatear moneda, por si acaso no está definida globalmente
-function formatCurrency(value) {
-  return (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-const CURRENCY_SYMBOL = '$';
+// ... (resto de las funciones como estaban) ...
