@@ -1,10 +1,110 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- ... otros head elements ... -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Billetera Feria Escolar</title>
   <!-- Carga de Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- ... otros styles ... -->
+  <style>
+    body { 
+      font-family: 'Inter', sans-serif; 
+      overflow: hidden; 
+      height: 100vh; 
+      margin: 0; 
+      padding: 0; 
+    }
+    .currency-display { font-variant-numeric: tabular-nums; }
+    /* Estilo para asegurar que el canvas del QR sea visible y se centre */
+    #qr-code-container > canvas,
+    #qr-pago-container > canvas {
+        margin: 0 auto;
+        display: block;
+        width: 220px !important; 
+        height: 220px !important;
+    }
+    /* Estilo para el contenedor de la app que ahora ocupa toda la pantalla */
+    #app-container {
+        width: 100%;
+        height: 100vh;
+        padding: 0;
+        margin: 0;
+        background-color: #f3f4f6; /* bg-gray-100 */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        overflow-y: auto;
+    }
+    /* Estilo para el contenido interno de cada vista */
+    .app-content {
+        width: 100%;
+        max-width: 600px; /* Equivalente a max-w-lg */
+        padding: 1rem; /* p-4 */
+        background-color: white; /* bg-white */
+        border-radius: 0.75rem; /* rounded-xl */
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* shadow-2xl */
+        margin-top: 1rem; /* mt-4 */
+        margin-bottom: 1rem; /* mb-4 */
+        transition: all 0.3s ease-in-out;
+    }
+    /* Estilos para la vista de escaneo */
+    #scanner-container {
+        width: 100%;
+        max-width: 600px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background-color: black;
+        color: white;
+        align-items: center;
+        justify-content: flex-start; /* Ajustado para dejar espacio arriba */
+        padding-top: 1rem; /* Añadido padding superior */
+    }
+    #scanner-container video {
+        width: 100%;
+        max-width: 500px;
+        height: auto;
+        object-fit: cover;
+        border-radius: 0.5rem; /* Opcional: bordes redondeados */
+    }
+    #scanner-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 80%;
+        border: 2px solid #00ff00; /* Verde para el marco */
+        pointer-events: none;
+    }
+    #scanner-controls {
+        position: relative; /* Cambiado de absolute a relative */
+        bottom: auto; /* Removido */
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 1rem; /* Espacio debajo del video */
+    }
+    #scanner-controls button {
+        margin: 0 0.5rem;
+    }
+    #scanner-message {
+        margin-top: 1rem; /* Espacio debajo de los controles */
+        width: 100%;
+        text-align: center;
+        /* Ajuste de color para visibilidad */
+        color: white;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    /* Canvas oculto */
+    #scanner-canvas {
+        display: none;
+    }
+  </style>
 </head>
 <body class="bg-gray-100">
 
@@ -26,14 +126,14 @@
   <script src="views/home.js"></script>
   <script src="views/pago.js"></script>
   <script src="views/qr.js"></script>
-  <script src="views/qrPago.js"></script> <!-- Asegúrate de que este esté antes de logic/main.js -->
+  <script src="views/qrPago.js"></script>
   <script src="views/escanear.js"></script>
   <script src="views/transfer.js"></script>
   <script src="views/registro.js"></script>
   <script src="views/notFound.js"></script>
 
   <!-- Incluir lógica principal -->
-  <script src="logic/main.js"></script> <!-- Asegúrate de que este esté antes del script principal de index.html -->
+  <script src="logic/main.js"></script>
 
   <script>
     // === VISTAS ===
