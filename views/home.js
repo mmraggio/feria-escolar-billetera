@@ -2,7 +2,7 @@
 
 // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
 function getHomeButtons() {
-    // Definir botones comunes
+    // Definir botones comunes para todos los roles
     const botonesComunes = [
         {
             texto: "Mi QR",
@@ -18,20 +18,18 @@ function getHomeButtons() {
             texto: "Transferir",
             icono: "swap_horiz", // Puedes usar un icono de texto o un SVG aquí
             onClick: "switchView('transfer')"
+        },
+        // Botón de Generar QR de Cobro para todos (la lógica interna verificará el rol)
+        {
+            texto: "Generar QR",
+            icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
+            onClick: "switchView('qrPago')" // Va a la vista específica para generar QR de cobro
         }
     ];
 
-    // Añadir botón específico para negocio
-    if (rol === 'negocio') {
-        botonesComunes.push({
-            texto: "Generar QR",
-            icono: "qr_code_2", // Puedes usar un icono de texto o un SVG aquí
-            onClick: "switchView('pago')" // Va a la vista de pago para generar
-        });
-    }
-
-    // Generar HTML para los botones en una cuadrícula de 3 columnas
-    let html = '<div class="grid grid-cols-3 gap-4">';
+    // Generar HTML para los botones en una cuadrícula de 3 columnas (2 filas)
+    // Asumiendo 4 botones, se distribuyen en 2 filas de 2 botones cada una para una mejor apariencia.
+    let html = '<div class="grid grid-cols-2 gap-4 max-w-xs mx-auto">'; // Cambiado a 2 columnas
     botonesComunes.forEach(boton => {
         html += `
         <button onclick="${boton.onClick}"
