@@ -260,6 +260,14 @@
           }, 4000);
         }
       }
+
+      // Despues de renderizar, si es necesario, actualizar vistas QR
+      if (currentView === 'qr') {
+        setTimeout(updateQRView, 0);
+      }
+      if (currentView === 'qrPago') {
+        setTimeout(updateQRPagoView, 0);
+      }
     };
 
     const showMessage = (text, type) => {
@@ -274,13 +282,24 @@
         currentView = newView;
         message = { text: '', type: '' };
         renderApp();
-        if (newView === 'qr') {
-            setTimeout(updateQRView, 0);
-        }
-        if (newView === 'qrPago') {
-            setTimeout(updateQRPagoView, 0);
-        }
+        // No se llama updateQRView aquí, sino después de renderizar
     };
+
+    // --- MODULARIZACIÓN: Funciones para la pantalla principal (home) ---
+    function getHomeButtons() {
+        return `
+            <div class="space-y-4">
+              <button onclick="switchView('pago')"
+                      class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
+                Pagar a un Negocio
+              </button>
+              <button onclick="switchView('qr')"
+                      class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
+                Mi QR <!-- ✅ CAMBIADO -->
+              </button>
+            </div>
+        `;
+    }
 
     function getHomeView() {
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -298,16 +317,7 @@
           <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
         </div>
 
-        <div class="space-y-4">
-          <button onclick="switchView('pago')"
-                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
-            Pagar a un Negocio
-          </button>
-          <button onclick="switchView('qr')"
-                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
-            Mi QR <!-- ✅ CAMBIADO -->
-          </button>
-        </div>
+        ${getHomeButtons()} <!-- Incluye los botones modularizados -->
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
       `;
     }
@@ -425,11 +435,15 @@
                 console.error('Error al generar QR:', error);
                 // Mostrar mensaje de error en la UI
                 errorDiv.classList.remove('hidden');
+              } else {
+                 // Opcional: Añadir un mensaje de éxito o depuración
+                 console.log('QR generado correctamente en #qr-code-container');
               }
-              // console.log('QR generado correctamente!');
             });
         } else {
-             console.error('Contenedor QR o userId no encontrado en updateQRView');
+             console.error('Contenedor QR o userId no encontrado en updateQRView o currentView no es "qr".');
+             if (!container) console.error('Elemento #qr-code-container no encontrado en el DOM.');
+             if (!userId) console.error('userId no está definido.');
         }
       }
     }
@@ -487,10 +501,14 @@
               if (error) {
                 console.error('Error al generar QR de pago:', error);
                 errorDiv.classList.remove('hidden'); // Mostrar error
+              } else {
+                 console.log('QR de pago generado correctamente en #qr-pago-container');
               }
             });
         } else {
-             console.error('Contenedor QR Pago o tempPagoData no encontrado en updateQRPagoView');
+             console.error('Contenedor QR Pago o tempPagoData no encontrado en updateQRPagoView o currentView no es "qrPago".');
+             if (!container) console.error('Elemento #qr-pago-container no encontrado en el DOM.');
+             if (!window.tempPagoData) console.error('window.tempPagoData no está definido.');
         }
       }
     }
