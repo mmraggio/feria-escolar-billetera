@@ -19,6 +19,10 @@
     <!-- Contenedor principal de la aplicación -->
   </div>
 
+  <!-- Scripts de Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
     const firebaseConfig = {
@@ -39,7 +43,11 @@
       db = firebase.firestore();
     } catch (e) {
       console.error("Error al inicializar Firebase:", e);
-      document.getElementById("app-container").innerHTML = `<div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">Error: No se pudo inicializar Firebase. Revisa la consola.</div>`;
+      document.getElementById("app-container").innerHTML = `
+        <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
+          Error: No se pudo inicializar Firebase. Revisa la consola.
+        </div>
+      `;
     }
 
     // === VARIABLES GLOBALES ===
