@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Billetera Feria Escolar</title>
-
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -16,19 +15,15 @@
 </head>
 
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300">
-    <!-- Contenedor principal -->
-  </div>
+  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300"></div>
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- QRCode.js -->
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <script>
-    // === CONFIGURACIÓN FIREBASE ===
+    // === CONFIG FIREBASE ===
     const firebaseConfig = {
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
       authDomain: "feria-escolar-billetera.firebaseapp.com",
@@ -41,14 +36,19 @@
     let db = null, app = null;
     const BANK_ID = "banco-central";
     let rol = null, userId = null, userData = null;
-    let usuarios = [], transacciones = [];
+    let usuarios = [];
     let unsubscribeUsuarios = null;
+    let currentView = 'loading';
+    let message = { text: '', type: '' };
 
+    // === Inicializar Firebase ===
     try {
       app = firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
     } catch (e) {
-      document.getElementById("app-container").innerHTML = `<div class='p-8 text-center bg-red-100 text-red-800 rounded-lg'>Error inicializando Firebase</div>`;
+      console.error("Error Firebase:", e);
+      document.getElementById("app-container").innerHTML =
+        `<div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">Error al inicializar Firebase.</div>`;
     }
 
     // === CARGA INICIAL ===
@@ -64,6 +64,7 @@
       }
     };
 
+    // === Crear banco si no existe ===
     async function setupBanco() {
       const bancoRef = db.collection("usuarios").doc(BANK_ID);
       const doc = await bancoRef.get();
@@ -78,6 +79,7 @@
       }
     }
 
+    // === Cargar usuario ===
     function cargarUsuarioExistente() {
       db.collection("usuarios").doc(userId).get().then(doc => {
         if (doc.exists) {
@@ -85,23 +87,26 @@
           rol = userData.rol;
           escucharCambios();
           escucharUsuarios();
-          escucharTransacciones();
           switchView('home');
         } else {
           localStorage.removeItem("userId");
           switchView('registro');
         }
+      }).catch(() => {
+        showMessage("Error al cargar usuario.", 'error');
       });
     }
 
+    // === Escuchar cambios del usuario ===
     function escucharCambios() {
       if (unsubscribeUsuarios) unsubscribeUsuarios();
       unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
         userData = doc.data();
-        renderApp();
+        if (['home', 'pago', 'transfer', 'qr'].includes(currentView)) renderApp();
       });
     }
 
+    // === Escuchar lista de negocios ===
     function escucharUsuarios() {
       db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
         usuarios = [];
@@ -110,199 +115,224 @@
       });
     }
 
-    function escucharTransacciones() {
-      db.collection("transacciones").orderBy("fecha", "desc").onSnapshot(snap => {
-        transacciones = [];
-        snap.forEach(doc => {
-          const data = doc.data();
-          if (data.emisor === userId || data.receptor === userId)
-            transacciones.push({ id: doc.id, ...data });
-        });
-        if (currentView === 'historial') renderApp();
-      });
+    // === Función general de render ===
+    function renderApp() {
+      const views = {
+        home: getHomeView,
+        registro: getRegistroView,
+        pago: getPagoView,
+        qr: getQRView,
+        transfer: getTransferView,
+        loading: () => `
+          <div class="flex flex-col items-center justify-center p-10">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando...</p>
+          </div>
+        `
+      };
+      const viewFunc = views[currentView];
+      if (!viewFunc) {
+        document.getElementById('app-container').innerHTML =
+          `<div class="text-center text-red-600 font-bold p-8">Error en la vista.</div>`;
+        return;
+      }
+      document.getElementById('app-container').innerHTML = viewFunc();
     }
 
-    // === MANEJO DE VISTAS ===
-    let currentView = 'loading';
-    let message = { text: '', type: '' };
+    // === Cambio de vistas ===
+    window.switchView = (view) => {
+      currentView = view;
+      message = { text: '', type: '' };
+      renderApp();
+      if (view === 'qr') setTimeout(() => generarQR(), 0);
+    };
 
+    // === Mostrar mensajes ===
     const showMessage = (text, type) => {
       message = { text, type };
       renderApp();
     };
 
-    window.switchView = (view) => {
-      currentView = view;
-      message = { text: '', type: '' };
-      renderApp();
-      if (view === 'qr') setTimeout(() => generarQR('qr-code-container', userId), 0);
-    };
-
-    const generarQR = (containerId, text) => {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      el.innerHTML = '';
-      new QRCode(el, { text, width: 200, height: 200 });
-    };
-
-    // === VISTAS ===
-    const formatCurrency = (v) => v?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0.00';
-
-    const getHomeView = () => `
-      <h1 class="text-3xl font-bold text-center mb-6">Feria Escolar - Billetera</h1>
-      <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center">
-        <p class="text-sm">Tu saldo</p>
-        <p class="text-4xl font-black text-indigo-900">$${formatCurrency(userData?.saldo)}</p>
-        <p class="text-xs text-gray-500">ID: ${userId}</p>
-      </div>
-      <div class="space-y-3">
-        <button onclick="switchView('qr')" class="w-full bg-indigo-600 text-white py-3 rounded-lg">Mi QR</button>
-        <button onclick="switchView('pago')" class="w-full bg-green-600 text-white py-3 rounded-lg">Pagar</button>
-        <button onclick="switchView('transfer')" class="w-full bg-gray-600 text-white py-3 rounded-lg">Transferir</button>
-        <button onclick="switchView('historial')" class="w-full bg-yellow-500 text-white py-3 rounded-lg">Historial</button>
-      </div>
-    `;
-
-    const getRegistroView = () => `
-      <h1 class="text-2xl font-bold mb-4">Registrar Usuario</h1>
-      <input id="nombre-usuario" placeholder="Nombre" class="w-full border p-3 rounded mb-4">
-      <div class="space-y-2">
-        <button onclick="rol='cliente'; iniciarUsuario()" class="w-full bg-green-600 text-white py-3 rounded">Soy Cliente</button>
-        <button onclick="rol='negocio'; iniciarUsuario()" class="w-full bg-indigo-600 text-white py-3 rounded">Soy Negocio</button>
-      </div>
-    `;
-
-    const getQRView = () => `
-      <div class="text-center">
-        <h1 class="text-2xl font-bold mb-4">Mi Código QR</h1>
-        <p>${userData?.nombre}</p>
-        <div id="qr-code-container" class="border p-4 bg-white inline-block rounded"></div>
-        <p class="text-gray-500 text-sm mt-2">ID: ${userId}</p>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
-      </div>
-    `;
-
-    const getPagoView = () => {
-      const opciones = usuarios.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('') || '<option>No hay negocios</option>';
-      return `
-        <h1 class="text-2xl font-bold mb-4">Pagar a Negocio</h1>
-        <form onsubmit="processPayment(event)" class="space-y-3">
-          <select id="negocio-select" class="w-full border p-3 rounded" required>
-            <option value="">Selecciona negocio</option>${opciones}
-          </select>
-          <input id="monto-pago" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
-          <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Pagar</button>
-        </form>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
-      `;
-    };
-
-    const getTransferView = () => `
-      <h1 class="text-2xl font-bold mb-4">Transferir Dinero</h1>
-      <form onsubmit="processTransfer(event)" class="space-y-3">
-        <input id="destinatario-id" placeholder="ID destino (4 dígitos)" maxlength="4" class="w-full border p-3 rounded" required pattern="[0-9]{4}">
-        <input id="monto-transfer" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
-        <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Transferir</button>
-      </form>
-      <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
-    `;
-
-    const getHistorialView = () => {
-      if (transacciones.length === 0) return `
-        <h1 class="text-2xl font-bold mb-4 text-center">Historial</h1>
-        <p class="text-center text-gray-500">Sin transacciones</p>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>`;
-      const filas = transacciones.map(t => {
-        const tipo = t.tipo === "venta" ? "Pago" : "Transferencia";
-        const signo = t.emisor === userId ? "-" : "+";
-        const color = t.emisor === userId ? "text-red-600" : "text-green-600";
-        const fecha = new Date(t.fecha.seconds * 1000).toLocaleString();
-        return `<tr class="border-b"><td>${tipo}</td><td>${t.emisor===userId?"A "+t.receptor:"De "+t.emisor}</td><td class="${color}">${signo}$${t.monto.toFixed(2)}</td><td class="text-xs text-gray-500">${fecha}</td></tr>`;
-      }).join('');
-      return `
-        <h1 class="text-2xl font-bold mb-4 text-center">Historial</h1>
-        <div class="overflow-y-auto max-h-96 border rounded">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-100"><tr><th>Tipo</th><th>Contraparte</th><th>Monto</th><th>Fecha</th></tr></thead>
-            <tbody>${filas}</tbody>
-          </table>
-        </div>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>`;
-    };
-
-    // === RENDER ===
-    function renderApp() {
-      const views = {
-        home: getHomeView,
-        registro: getRegistroView,
-        qr: getQRView,
-        pago: getPagoView,
-        transfer: getTransferView,
-        historial: getHistorialView
-      };
-      const viewFunc = views[currentView];
-      document.getElementById('app-container').innerHTML = viewFunc ? viewFunc() : `<p class='text-red-500 text-center'>Error en la vista</p>`;
-    }
-
-    // === FUNCIONES DE NEGOCIO ===
+    // === Crear nuevo usuario ===
     async function iniciarUsuario() {
       const nombre = document.getElementById("nombre-usuario").value.trim();
       if (!nombre) return alert("Ingresa un nombre");
+
+      let nuevoId = null;
       for (let i = 1; i < 10000; i++) {
         const id = String(i).padStart(4, '0');
         const ref = db.collection("usuarios").doc(id);
         const doc = await ref.get();
         if (!doc.exists) {
-          await ref.set({ nombre, rol, saldo: rol==='cliente'?500:0, qrId:id, createdAt:new Date() });
+          nuevoId = id;
+          await ref.set({
+            nombre,
+            rol,
+            saldo: rol === 'cliente' ? 500 : 0,
+            qrId: id,
+            createdAt: new Date()
+          });
           localStorage.setItem("userId", id);
-          userId = id; userData = { nombre, rol, saldo: rol==='cliente'?500:0 };
-          escucharCambios(); escucharUsuarios(); escucharTransacciones();
+          userId = id;
+          userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+          escucharCambios();
+          escucharUsuarios();
           switchView('home');
           break;
         }
       }
+      if (!nuevoId) alert("No se pudo asignar un ID disponible.");
     }
 
+    // === Generar QR ===
+    function generarQR() {
+      const cont = document.getElementById('qr-code-container');
+      if (!cont || !userId) return;
+      cont.innerHTML = '';
+      new QRCode(cont, {
+        text: userId,
+        width: 200,
+        height: 200
+      });
+    }
+
+    // === VISTAS ===
+    function getHomeView() {
+      if (!userData) return `<div class="text-center p-8">Cargando datos...</div>`;
+      const saldo = userData.saldo?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0.00';
+      return `
+        <h1 class="text-3xl font-bold text-center mb-6">Feria Escolar - Billetera</h1>
+        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center">
+          <p class="text-sm">Saldo disponible</p>
+          <p class="text-4xl font-black text-indigo-900 currency-display">$${saldo}</p>
+          <p class="text-xs text-gray-500 mt-2">ID: ${userId}</p>
+        </div>
+        <div class="space-y-3">
+          <button onclick="switchView('qr')" class="w-full bg-indigo-600 text-white py-3 rounded-lg">Mi QR</button>
+          <button onclick="switchView('pago')" class="w-full bg-green-600 text-white py-3 rounded-lg">Pagar</button>
+          <button onclick="switchView('transfer')" class="w-full bg-gray-600 text-white py-3 rounded-lg">Transferir</button>
+        </div>
+      `;
+    }
+
+    function getRegistroView() {
+      return `
+        <h1 class="text-2xl font-bold mb-4 text-gray-800 text-center">Registrar Usuario</h1>
+        <input id="nombre-usuario" placeholder="Ingresa tu nombre" class="w-full border border-gray-300 rounded-md p-3 mb-3">
+        <div class="space-y-2">
+          <button onclick="rol='cliente'; iniciarUsuario()" class="w-full bg-green-600 text-white py-3 rounded-lg">Soy Cliente</button>
+          <button onclick="rol='negocio'; iniciarUsuario()" class="w-full bg-indigo-600 text-white py-3 rounded-lg">Soy Negocio</button>
+        </div>
+      `;
+    }
+
+    function getQRView() {
+      if (!userData) return `<div class="text-center p-8">Cargando...</div>`;
+      return `
+        <div class="text-center">
+          <h1 class="text-2xl font-bold mb-4">Mi Código QR</h1>
+          <p class="font-semibold">${userData.nombre}</p>
+          <p class="text-gray-500 mb-4">ID: ${userId}</p>
+          <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
+          <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 text-white py-2 rounded-lg">Volver</button>
+        </div>
+      `;
+    }
+
+    function getPagoView() {
+      if (!userData) return `<div class="text-center p-8">Cargando...</div>`;
+      const negocios = usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('') || '<option>No hay negocios disponibles</option>';
+      return `
+        <h1 class="text-2xl font-bold mb-4">Pagar</h1>
+        <form onsubmit="processPayment(event)" class="space-y-3">
+          <select id="negocio-select" class="w-full border p-3 rounded" required>
+            <option value="">Selecciona un negocio</option>
+            ${negocios}
+          </select>
+          <input id="monto-pago" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
+          <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Confirmar Pago</button>
+        </form>
+        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
+      `;
+    }
+
+    function getTransferView() {
+      return `
+        <h1 class="text-2xl font-bold mb-4">Transferir Dinero</h1>
+        <form onsubmit="processTransfer(event)" class="space-y-3">
+          <input id="destinatario-id" placeholder="ID de destino (4 dígitos)" maxlength="4" class="w-full border p-3 rounded" required pattern="[0-9]{4}">
+          <input id="monto-transfer" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
+          <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Transferir</button>
+        </form>
+        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
+      `;
+    }
+
+    // === FUNCIONES DE NEGOCIO ===
     window.processPayment = async (e) => {
       e.preventDefault();
       const receiverId = document.getElementById('negocio-select').value;
       const amount = parseFloat(document.getElementById('monto-pago').value);
-      if (!receiverId || amount <= 0) return showMessage("Datos inválidos","error");
-      if (amount > userData.saldo) return showMessage("Saldo insuficiente","error");
+      if (!receiverId || amount <= 0) return showMessage("Datos inválidos", "error");
+      if (amount > (userData?.saldo || 0)) return showMessage("Saldo insuficiente", "error");
       const senderRef = db.collection("usuarios").doc(userId);
       const receiverRef = db.collection("usuarios").doc(receiverId);
       const bancoRef = db.collection("usuarios").doc(BANK_ID);
       const transRef = db.collection("transacciones").doc();
-      await db.runTransaction(async t => {
-        const s = await t.get(senderRef); const r = await t.get(receiverRef); const b = await t.get(bancoRef);
-        if (!s.exists || !r.exists || !b.exists) throw "Usuario no encontrado";
-        const comision = rol==='negocio'?amount*0.05:0;
-        t.update(senderRef,{saldo:s.data().saldo-amount});
-        t.update(receiverRef,{saldo:r.data().saldo+amount-comision});
-        t.update(bancoRef,{saldo:b.data().saldo+comision});
-        t.set(transRef,{tipo:"venta",emisor:userId,receptor:receiverId,monto:amount,fecha:new Date()});
-      });
-      showMessage("Pago realizado","success"); switchView('home');
+      try {
+        await db.runTransaction(async t => {
+          const s = await t.get(senderRef), r = await t.get(receiverRef), b = await t.get(bancoRef);
+          if (!s.exists || !r.exists || !b.exists) throw "Usuario no encontrado";
+          const comision = rol === 'negocio' ? amount * 0.05 : 0;
+          t.update(senderRef, { saldo: s.data().saldo - amount });
+          t.update(receiverRef, { saldo: r.data().saldo + amount - comision });
+          t.update(bancoRef, { saldo: b.data().saldo + comision });
+          t.set(transRef, {
+            tipo: "venta",
+            emisor: userId,
+            receptor: receiverId,
+            monto: amount,
+            fecha: new Date()
+          });
+        });
+        showMessage("Pago realizado", "success");
+        switchView('home');
+      } catch (err) {
+        console.error(err);
+        showMessage("Error procesando pago", "error");
+      }
     };
 
     window.processTransfer = async (e) => {
       e.preventDefault();
       const receiverId = document.getElementById('destinatario-id').value.trim();
       const amount = parseFloat(document.getElementById('monto-transfer').value);
-      if (!receiverId.match(/^[0-9]{4}$/)) return showMessage("ID inválido","error");
-      if (receiverId===userId) return showMessage("No puedes transferirte a ti mismo","error");
-      if (amount<=0 || amount>userData.saldo) return showMessage("Monto inválido o saldo insuficiente","error");
-      const senderRef=db.collection("usuarios").doc(userId);
-      const receiverRef=db.collection("usuarios").doc(receiverId);
-      const transRef=db.collection("transacciones").doc();
-      await db.runTransaction(async t=>{
-        const s=await t.get(senderRef); const r=await t.get(receiverRef);
-        if(!r.exists) throw "Destinatario no encontrado";
-        t.update(senderRef,{saldo:s.data().saldo-amount});
-        t.update(receiverRef,{saldo:r.data().saldo+amount});
-        t.set(transRef,{tipo:"transferencia",emisor:userId,receptor:receiverId,monto:amount,fecha:new Date()});
-      });
-      showMessage("Transferencia exitosa","success"); switchView('home');
+      if (!receiverId.match(/^[0-9]{4}$/)) return showMessage("ID inválido", "error");
+      if (receiverId === userId) return showMessage("No puedes transferirte a ti mismo", "error");
+      if (amount <= 0 || amount > (userData?.saldo || 0)) return showMessage("Monto inválido o saldo insuficiente", "error");
+      const senderRef = db.collection("usuarios").doc(userId);
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+      const transRef = db.collection("transacciones").doc();
+      try {
+        await db.runTransaction(async t => {
+          const s = await t.get(senderRef), r = await t.get(receiverRef);
+          if (!r.exists) throw "Destinatario no encontrado";
+          t.update(senderRef, { saldo: s.data().saldo - amount });
+          t.update(receiverRef, { saldo: r.data().saldo + amount });
+          t.set(transRef, {
+            tipo: "transferencia",
+            emisor: userId,
+            receptor: receiverId,
+            monto: amount,
+            fecha: new Date()
+          });
+        });
+        showMessage("Transferencia exitosa", "success");
+        switchView('home');
+      } catch (err) {
+        console.error(err);
+        showMessage("Error al transferir", "error");
+      }
     };
 
     if (db) renderApp();
