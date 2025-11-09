@@ -727,7 +727,7 @@
                     // Validar ID (4 dígitos) y Monto (> 0)
                     if (receiverId.match(/^\d{4}$/) && !isNaN(amount) && amount > 0) {
                          // Guardar los datos en la variable temporal y cambiar 
- de vista
+                         // de vista
                          window.tempScannedPaymentData = { receiverId, amount }; 
                          switchView('pago');
                     } else {
@@ -737,7 +737,7 @@
                     
                 } else {
                     messageEl.textContent = `QR no reconocido como código de 
- cobro. Formato esperado: ID,Monto.`;
+                     // cobro. Formato esperado: ID,Monto.`;
                 }
                 
             }).catch(err => {
