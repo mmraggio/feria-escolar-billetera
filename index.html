@@ -2,33 +2,128 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Billetera Feria Escolar</title>
-
-  <!-- Tailwind CSS -->
+  <!-- Carga de Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    body { 
+      font-family: 'Inter', sans-serif; 
+      overflow: hidden; 
+      height: 100vh; 
+      margin: 0; 
+      padding: 0; 
+    }
     .currency-display { font-variant-numeric: tabular-nums; }
+    /* Estilo para asegurar que el canvas del QR sea visible y se centre */
+    #qr-code-container > canvas,
+    #qr-pago-container > canvas {
+        margin: 0 auto;
+        display: block;
+        width: 220px !important; 
+        height: 220px !important;
+    }
+    /* Estilo para el contenedor de la app que ahora ocupa toda la pantalla */
+    #app-container {
+        width: 100%;
+        height: 100vh;
+        padding: 0;
+        margin: 0;
+        background-color: #f3f4f6; /* bg-gray-100 */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        overflow-y: auto;
+    }
+    /* Estilo para el contenido interno de cada vista */
+    .app-content {
+        width: 100%;
+        max-width: 600px; /* Equivalente a max-w-lg */
+        padding: 1rem; /* p-4 */
+        background-color: white; /* bg-white */
+        border-radius: 0.75rem; /* rounded-xl */
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* shadow-2xl */
+        margin-top: 1rem; /* mt-4 */
+        margin-bottom: 1rem; /* mb-4 */
+        transition: all 0.3s ease-in-out;
+    }
+    /* Estilos para la vista de escaneo */
+    #scanner-container {
+        width: 100%;
+        max-width: 600px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background-color: black;
+        color: white;
+        align-items: center;
+        justify-content: flex-start; /* Ajustado para dejar espacio arriba */
+        padding-top: 1rem; /* Añadido padding superior */
+    }
+    #scanner-container video {
+        width: 100%;
+        max-width: 500px;
+        height: auto;
+        object-fit: cover;
+        border-radius: 0.5rem; /* Opcional: bordes redondeados */
+    }
+    #scanner-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 80%;
+        border: 2px solid #00ff00; /* Verde para el marco */
+        pointer-events: none;
+    }
+    #scanner-controls {
+        position: relative; /* Cambiado de absolute a relative */
+        bottom: auto; /* Removido */
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 1rem; /* Espacio debajo del video */
+    }
+    #scanner-controls button {
+        margin: 0 0.5rem;
+    }
+    #scanner-message {
+        margin-top: 1rem; /* Espacio debajo de los controles */
+        width: 100%;
+        text-align: center;
+        /* Ajuste de color para visibilidad */
+        color: white;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    /* Canvas oculto */
+    #scanner-canvas {
+        display: none;
+    }
   </style>
 </head>
+<body class="bg-gray-100">
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300">
-    <!-- Contenedor principal -->
+  <div id="app-container">
+    <!-- Contenido de la aplicación -->
   </div>
 
-  <!-- Firebase -->
+  <!-- Scripts de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <!-- QRCode.js -->
+  <!-- Librería QRCode.js -->
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
+  <!-- Librería jsQR para escaneo -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
   <script>
-    // === CONFIGURACIÓN FIREBASE ===
+    // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
     const firebaseConfig = {
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
       authDomain: "feria-escolar-billetera.firebaseapp.com",
@@ -38,28 +133,38 @@
       appId: "1:311026746803:web:fc891c988b9da3faee37c6"
     };
 
-    let db = null, app = null;
+    let db = null;
+    let app = null;
 
+    // Inicializar Firebase
     try {
       app = firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
     } catch (e) {
       console.error("Error al inicializar Firebase:", e);
       document.getElementById("app-container").innerHTML = `
-        <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
-          Error: No se pudo inicializar Firebase.
-        </div>`;
+        <div class="flex items-center justify-center h-full">
+          <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg max-w-xs w-full">
+            Error: No se pudo inicializar Firebase. Revisa la consola.
+          </div>
+        </div>
+      `;
     }
 
     // === VARIABLES GLOBALES ===
-    const BANK_ID = "banco-central";
-    let rol = null, userId = null, userData = null;
-    let usuarios = [], transacciones = [];
+    const BANK_ID = "banco-central"; // ID fijo para el banco
+    let rol = null;
+    let userId = null;
+    let userData = null;
+    let usuarios = []; // Lista de comercios para pagar
     let unsubscribeUsuarios = null;
+    let tempPagoData = null; // Variable temporal para datos de pago escaneado
 
-    // === CARGA INICIAL ===
+    // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
-      if (!db) return;
+      if (!db) return; // Si Firebase no se inicializó, no hacer nada
+
+      // Crear banco si no existe
       setupBanco().then(() => {
         const savedId = localStorage.getItem("userId");
         if (savedId) {
@@ -74,18 +179,20 @@
       });
     };
 
+    // === CREAR BANCO SI NO EXISTE ===
     async function setupBanco() {
       const bancoRef = db.collection("usuarios").doc(BANK_ID);
       const doc = await bancoRef.get();
+
       if (!doc.exists) {
         await bancoRef.set({
           nombre: "Banco Nacional",
           rol: "banco",
-          saldo: 0,
+          saldo: 1000000, // Saldo inicial
           qrId: BANK_ID,
           createdAt: new Date()
         });
-        console.log("Banco creado.");
+        console.log("Banco Nacional creado automáticamente.");
       }
     }
 
@@ -96,137 +203,313 @@
           rol = userData.rol;
           escucharCambios();
           escucharUsuarios();
-          escucharTransacciones();
           switchView('home');
         } else {
-          alert("Usuario no encontrado.");
+          // Usamos modal UI en lugar de alert
+          showMessage("Usuario no encontrado. Reinicia la app.", 'error');
           localStorage.removeItem("userId");
           mostrarFormulario();
         }
-      }).catch(e => showMessage("Error al cargar usuario.", 'error'));
+      }).catch(e => {
+        console.error("Error al cargar usuario:", e);
+        showMessage("Error al cargar usuario.", 'error');
+      });
     }
 
     function mostrarFormulario() {
       switchView('registro');
     }
 
-    // === CREACIÓN DE USUARIO ===
+    // === FUNCIÓN CORREGIDA PARA INICIAR USUARIO ===
     async function iniciarUsuario() {
       const btn = document.getElementById("btn-guardar");
       if (!btn) return;
       btn.disabled = true;
       btn.textContent = "Creando usuario...";
 
-      const nombre = document.getElementById("nombre-usuario").value.trim();
+      const nombreInput = document.getElementById("nombre-usuario");
+      const nombre = nombreInput.value.trim();
       if (!nombre) {
-        alert("Ingresa un nombre");
+        showMessage("Ingresa un nombre", 'error');
+        btn.disabled = false;
+        btn.textContent = "Guardar y Entrar";
+        return;
+      }
+      if (!rol) {
+        showMessage("Selecciona un rol (Cliente o Negocio)", 'error');
         btn.disabled = false;
         btn.textContent = "Guardar y Entrar";
         return;
       }
 
+
+      // Buscar un ID disponible (4 dígitos) de forma síncrona
       let nuevoId = null;
-      for (let i = 1; i < 10000; i++) {
-        const id = String(i).padStart(4, '0');
+      let intentos = 1; // Empezar en 1 para evitar 0000
+
+      while (nuevoId === null && intentos < 10000) {
+        const id = String(intentos).padStart(4, '0');
+        intentos++;
         const docRef = db.collection("usuarios").doc(id);
-        const doc = await docRef.get();
-        if (!doc.exists) {
-          nuevoId = id;
-          await docRef.set({
-            nombre,
-            rol,
-            saldo: rol === 'cliente' ? 500 : 0,
-            qrId: id,
-            createdAt: new Date()
-          });
-          localStorage.setItem("userId", id);
-          userId = id;
-          userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
-          escucharCambios();
-          escucharUsuarios();
-          escucharTransacciones();
-          switchView('home');
-          break;
+
+        try {
+          const doc = await docRef.get();
+          if (!doc.exists) {
+            nuevoId = id;
+
+            await docRef.set({
+              nombre,
+              rol,
+              saldo: rol === 'cliente' ? 500 : 0,
+              qrId: id,
+              createdAt: new Date()
+            });
+
+            localStorage.setItem("userId", id);
+            userId = id;
+            userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+            escucharCambios();
+            escucharUsuarios();
+            showMessage(`Usuario ${nombre} (${id}) creado como ${rol}.`, 'success');
+            switchView('home');
+            break; // Salir del bucle una vez creado
+          }
+        } catch (e) {
+          console.error("Error al crear usuario:", e);
+          showMessage("Hubo un error al crear el usuario. Inténtalo de nuevo.", 'error');
+          btn.disabled = false;
+          btn.textContent = "Guardar y Entrar";
+          return;
         }
       }
-      if (!nuevoId) alert("Error creando usuario.");
+
+      if (!nuevoId) {
+        showMessage("No se pudo asignar un ID (Máximo de 9999 usuarios).", 'error');
+        btn.disabled = false;
+        btn.textContent = "Guardar y Entrar";
+      }
     }
 
     function escucharCambios() {
       if (unsubscribeUsuarios) unsubscribeUsuarios();
       unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
         userData = doc.data();
-        if (['home', 'pago', 'transfer', 'historial'].includes(currentView)) renderApp();
+        // Solo refrescar vistas que lo necesiten
+        if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer') renderApp();
       });
     }
 
     function escucharUsuarios() {
-      db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
+      // Escucha solo negocios (y el banco si es necesario, pero lo filtramos luego)
+      db.collection("usuarios").onSnapshot(snap => {
         usuarios = [];
-        snap.forEach(doc => usuarios.push({ id: doc.id, ...doc.data() }));
+        snap.forEach(doc => {
+          const data = doc.data();
+          // Solo incluimos negocios en la lista de pago, excluyendo el banco
+          if (data.rol === 'negocio' && doc.id !== BANK_ID) {
+            usuarios.push({ id: doc.id, ...data });
+          }
+        });
         if (currentView === 'pago') renderApp();
       });
     }
 
-    function escucharTransacciones() {
-      db.collection("transacciones")
-        .orderBy("fecha", "desc")
-        .onSnapshot(snap => {
-          transacciones = [];
-          snap.forEach(doc => {
-            const data = doc.data();
-            if (data.emisor === userId || data.receptor === userId)
-              transacciones.push({ id: doc.id, ...data });
-          });
-          if (currentView === 'historial') renderApp();
-        });
-    }
-
-    // === SISTEMA DE VISTAS ===
+    // === VISTAS ===
     let currentView = 'loading';
     let message = { text: '', type: '' };
 
+    const renderApp = () => {
+      let content = '';
+
+      if (currentView === 'loading') {
+        content = `
+          <div class="flex items-center justify-center h-full w-full">
+            <div class="flex flex-col items-center justify-center p-10">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+              <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando la aplicación...</p>
+              <p class="text-sm text-gray-500 mt-2">ID: ${userId || 'Cargando...'}</p>
+            </div>
+          </div>
+        `;
+      } else {
+        // Cada vista ahora se envuelve en un div con clase 'app-content'
+        switch (currentView) {
+          case 'home':
+            content = `<div class="app-content">${getHomeView()}</div>`;
+            break;
+          case 'registro':
+            content = `<div class="app-content">${getRegistroView()}</div>`;
+            break;
+          case 'pago':
+            content = `<div class="app-content">${getPagoView()}</div>`;
+            break;
+          case 'qr':
+            content = `<div class="app-content">${getQRView()}</div>`;
+            break;
+          case 'qrPago':
+            content = `<div class="app-content">${getQRPagoView()}</div>`;
+            break;
+          case 'transfer':
+            content = `<div class="app-content">${getTransferView()}</div>`;
+            break;
+          case 'escanear':
+            content = getEscanearView(); // Vista sin app-content
+            break;
+          // --- NUEVA VISTA QR COBRO ---
+          case 'qrCobro':
+            content = `<div class="app-content">${getQRCobroView()}</div>`;
+            break;
+          default:
+            content = `<div class="app-content">${getNotFoundView()}</div>`;
+            break;
+        }
+      }
+
+      document.getElementById('app-container').innerHTML = content;
+
+      // Mostrar mensaje - Ahora se añade fuera del app-content si es necesario
+      if (message.text) {
+        const messageElement = document.createElement('div');
+        messageElement.id = 'app-message';
+        const baseClasses = "p-3 rounded-lg text-sm font-medium transition-opacity duration-500 ease-in-out fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full";
+        let styleClass = message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+        messageElement.className = `${baseClasses} ${styleClass} opacity-100`;
+        messageElement.textContent = message.text;
+        
+        document.getElementById('app-container').appendChild(messageElement);
+
+        // Ocultar después de un tiempo
+        setTimeout(() => {
+          if(messageElement.parentNode) messageElement.parentNode.removeChild(messageElement);
+          message.text = '';
+        }, 4000);
+      }
+
+      // Despues de renderizar, si es necesario, actualizar vistas QR
+      if (currentView === 'qr') {
+        setTimeout(updateQRView, 0);
+      }
+      if (currentView === 'qrPago') {
+        setTimeout(updateQRPagoView, 0);
+      }
+      if (currentView === 'escanear') {
+        setTimeout(iniciarEscaneo, 0);
+      }
+      // --- ACTUALIZAR VISTA QR COBRO ---
+      if (currentView === 'qrCobro') {
+        // No es necesario un timeout aquí, ya que no depende de un QR que se genere asíncronamente
+        // pero si se quisiera limpiar un QR anterior, se podría hacer aquí.
+        // console.log("Vista QR Cobro renderizada.");
+      }
+      // --- CARGAR DATOS DESPUÉS DE RENDERIZAR PAGO ---
+      // Esta función se llama DESPUÉS de que el HTML de la vista de pago esté en el DOM
+      if (currentView === 'pago') {
+          setTimeout(cargarDatosEscaneados, 0); // Usamos un timeout pequeño para asegurar el renderizado
+      }
+    };
+
     const showMessage = (text, type) => {
       message = { text, type };
-      renderApp();
+      // Forzar renderizado para mostrar el mensaje inmediatamente si es posible
+      if (document.getElementById('app-container')) renderApp();
     };
 
     window.switchView = (newView) => {
-      currentView = newView;
-      message = { text: '', type: '' };
-      renderApp();
-      if (newView === 'qr') setTimeout(() => generarQR('qr-code-container', userId), 0);
+        if (newView === 'home' && window.tempPagoData) {
+            delete window.tempPagoData; // Limpiar datos temporales al ir a home
+        }
+        if (currentView === 'escanear') { // <-- ESTA PARTE ES CRUCIAL
+            detenerEscaneo(); // Detiene escaneo al salir
+        }
+        currentView = newView;
+        message = { text: '', type: '' };
+        renderApp();
+        if (currentView === 'qr') {
+            setTimeout(updateQRView, 0);
+        }
+        if (currentView === 'qrPago') {
+            setTimeout(updateQRPagoView, 0);
+        }
+        if (currentView === 'escanear') {
+            setTimeout(iniciarEscaneo, 0);
+        }
+        // --- ACTUALIZAR VISTA QR COBRO ---
+        if (currentView === 'qrCobro') {
+            // No hay una función específica como updateQRCobroView, la vista se actualiza con renderApp
+            // console.log("switchView: Vista qrCobro activada.");
+        }
     };
 
-    const generarQR = (idContenedor, texto) => {
-      const cont = document.getElementById(idContenedor);
-      if (!cont) return;
-      cont.innerHTML = '';
-      new QRCode(cont, {
-        text: texto,
-        width: 200,
-        height: 200,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
-    };
+    // --- FUNCIÓN PARA CARGAR DATOS ESCANEADOS EN VISTA DE PAGO ---
+    // Esta función se llama DESPUÉS de renderizar la vista de pago
+    function cargarDatosEscaneados() {
+        if (window.tempPagoData) {
+            const { receiverId, amount } = window.tempPagoData;
+            const negocio = usuarios.find(u => u.id === receiverId);
 
-    // === VISTAS ===
+            if (negocio) {
+                const negocioSelect = document.getElementById('negocio-select');
+                const montoInput = document.getElementById('monto-pago');
+
+                if (negocioSelect && montoInput) {
+                    negocioSelect.value = receiverId;
+                    montoInput.value = amount.toFixed(2);
+                    console.log("Datos cargados desde escaneo:", receiverId, amount.toFixed(2));
+                    // Opcional: Mostrar mensaje de éxito al usuario
+                    showMessage(`Datos cargados: ${negocio.nombre}, $${amount.toFixed(2)}`, 'success');
+                } else {
+                    console.error("Campos de pago no encontrados para cargar datos escaneados.");
+                    // Opcional: Mostrar mensaje al usuario
+                    showMessage("Error: No se pudieron cargar los datos escaneados.", 'error');
+                }
+            } else {
+                console.error("Negocio escaneado no encontrado en lista actual:", receiverId);
+                showMessage("Error: Negocio no encontrado.", 'error');
+            }
+            // Limpiar datos temporales después de usarlos
+            delete window.tempPagoData;
+        }
+    }
+
+    // --- VISTAS (INLINE) ---
+
     function getHomeView() {
-      const formatCurrency = (v) => v.toLocaleString('es-CL', { minimumFractionDigits: 2 });
+      const formatCurrency = (value) => (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const CURRENCY_SYMBOL = '$';
+
       return `
         <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
+        
+        <!-- Display de Saldo -->
         <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
-          <p class="text-sm font-medium text-indigo-700">Saldo (${userData?.rol})</p>
-          <p class="text-4xl font-black text-indigo-900 currency-display">$${formatCurrency(userData?.saldo || 0)}</p>
-          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono">${userId}</span></p>
+          <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
+          <p class="text-4xl font-black text-indigo-900 currency-display">
+            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
+          </p>
+          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
         </div>
-        <div class="space-y-3">
-          <button onclick="switchView('qr')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg">Mi QR</button>
-          <button onclick="switchView('pago')" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg">Pagar</button>
-          <button onclick="switchView('transfer')" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg">Transferir</button>
-          <button onclick="switchView('historial')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg">Historial</button>
+
+        <div class="space-y-4">
+          <button onclick="switchView('pago')"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
+            Pagar a un Negocio
+          </button>
+          <button onclick="switchView('qr')"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
+            Mi QR (Para recibir)
+          </button>
+          <!-- Botón de Transferencia entre Usuarios -->
+          <button onclick="switchView('transfer')"
+                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
+            Transferir a Usuario
+          </button>
+          <!-- Botón Generar QR de Cobro - Solo para Negocio -->
+          ${rol === 'negocio' ? `
+          <button onclick="switchView('qrCobro')"
+                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-blue-500/50">
+            Generar QR de Cobro
+          </button>
+          ` : ''}
         </div>
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
       `;
@@ -234,85 +517,712 @@
 
     function getRegistroView() {
       return `
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Registrar Usuario</h1>
-        <input type="text" id="nombre-usuario" placeholder="Nombre" class="block w-full border border-gray-300 rounded-md shadow-sm p-3 mb-4">
-        <div class="space-y-3">
-          <button onclick="rol='cliente'; iniciarUsuario()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg">Soy Cliente</button>
-          <button onclick="rol='negocio'; iniciarUsuario()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg">Soy Negocio</button>
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Registrar Usuario</h1>
+        
+        <div class="space-y-4">
+          <input type="text" id="nombre-usuario" placeholder="Ingresa tu nombre o negocio" 
+                  class="block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
+          
+          <button id="rol-cliente-btn" onclick="rol='cliente'; this.classList.add('ring-4', 'ring-green-400'); document.getElementById('rol-negocio-btn').classList.remove('ring-4', 'ring-indigo-400')"
+                  class="w-full bg-green-100 text-green-800 font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 hover:bg-green-200">
+            Soy Cliente (Recibo $500 iniciales)
+          </button>
+          <button id="rol-negocio-btn" onclick="rol='negocio'; this.classList.add('ring-4', 'ring-indigo-400'); document.getElementById('rol-cliente-btn').classList.remove('ring-4', 'ring-green-400')"
+                  class="w-full bg-indigo-100 text-indigo-800 font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 hover:bg-indigo-200">
+            Soy Negocio (Recibo $0 iniciales)
+          </button>
         </div>
+        <button id="btn-guardar" onclick="iniciarUsuario()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md mt-6">
+          Guardar y Entrar
+        </button>
       `;
+    }
+
+    function getPagoView() {
+      const CURRENCY_SYMBOL = '$';
+      const formatCurrency = (value) => (value || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const negocioOptions = usuarios.length > 0
+        ? usuarios.map(n => `<option value="${n.id}">${n.nombre} (ID: ${n.id})</option>`).join('')
+        : '<option value="">No hay negocios disponibles</option>';
+
+      // Mostrar botón de escanear solo si es cliente, y botón de generar QR solo si es negocio
+      let extraButtons = '';
+      if (rol === 'cliente') {
+          extraButtons = `
+              <button type="button" onclick="switchView('escanear')" 
+                      class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                Escanear QR de Negocio
+              </button>
+          `;
+      } else if (rol === 'negocio') {
+          extraButtons = `
+              <button type="button" onclick="generarQRPago()" 
+                      class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                Generar QR de Cobro (Cliente Escanea)
+              </button>
+          `;
+      }
+
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Pagar a Negocio</h1>
+        </div>
+
+        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
+        </div>
+        
+        <form id="pago-form" class="space-y-4">
+          <div>
+            <label for="negocio-select" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
+            <select id="negocio-select" required
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+              <option value="">-- Selecciona un negocio --</option>
+              ${negocioOptions}
+            </select>
+          </div>
+          <div>
+            <label for="monto-pago" class="block text-sm font-medium text-gray-700">Monto (${CURRENCY_SYMBOL})</label>
+            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          
+          <button type="button" onclick="confirmarPago()" 
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Pagar Ahora
+          </button>
+          ${extraButtons}
+        </form>
+      `;
+    }
+
+    // --- NUEVA VISTA: Generar QR de Cobro ---
+    function getQRCobroView() {
+        // Verificar si el rol es 'negocio' al cargar la vista
+        if (userData?.rol !== 'negocio') {
+            // Mostrar un mensaje de error si no es negocio
+            return `
+            <div class="flex items-center mb-6">
+              <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+              </button>
+              <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+            </div>
+            <div class="text-center p-6">
+                <p class="text-red-500 font-bold text-lg">Acceso Denegado</p>
+                <p class="text-gray-700 mt-2">Solo los negocios pueden generar QR de cobro.</p>
+                <button onclick="switchView('home')"
+                        class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                  Volver al Inicio
+                </button>
+            </div>
+            `;
+        }
+
+        // Si es negocio, mostrar la interfaz normal
+        const nombreUsuario = userData?.nombre || 'Usuario (ID Desconocido)';
+        const rolUsuario = userData?.rol || 'Desconocido';
+
+        // Contenedor para el QR generado (inicialmente vacío)
+        const qrContainerHtml = `<div id="qr-cobro-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
+        // Contenedor para el mensaje de estado (inicialmente vacío)
+        const statusMessageHtml = `<div id="qr-cobro-status" class="text-center mt-2 text-sm"></div>`;
+
+        const html = `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+        </div>
+
+        <!-- Display de Saldo y Rol -->
+        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
+          <p class="text-sm font-medium text-indigo-700">Tu Rol: ${rolUsuario}</p>
+          <p class="text-2xl font-black text-indigo-900 currency-display">
+            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
+          </p>
+          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
+        </div>
+
+        <!-- Formulario para generar QR -->
+        <form id="generar-qr-form" class="space-y-4">
+          <div>
+            <label for="monto-generar-qr" class="block text-sm font-medium text-gray-700">Monto a Cobrar (${CURRENCY_SYMBOL})</label>
+            <input type="number" id="monto-generar-qr" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          
+          <button type="button" onclick="generarQRCobro()"
+                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR de Cobro
+          </button>
+        </form>
+
+        <!-- Contenedor del QR generado -->
+        ${qrContainerHtml}
+        <!-- Mensaje de estado -->
+        ${statusMessageHtml}
+      `;
+      return html;
+    }
+
+    // --- FUNCIÓN PARA GENERAR QR DE COBRO ---
+    function generarQRCobro() {
+        // Verificar si el rol es 'negocio' otra vez, por si acaso
+        if (userData?.rol !== 'negocio') {
+            showMessage("Solo los negocios pueden generar QR de cobro.", 'error');
+            return;
+        }
+
+        const amountInput = document.getElementById('monto-generar-qr').value;
+        const amount = parseFloat(amountInput);
+
+        if (isNaN(amount) || amount <= 0) {
+            showMessage("Ingresa un monto válido para generar el cobro.", 'error');
+            return;
+        }
+
+        // El receptor es el propio negocio (userId)
+        const receiverId = userId;
+
+        // Guardar temporalmente los datos del pago (el negocio como receptor)
+        window.tempPagoData = { receiverId, amount };
+
+        // Actualizar el mensaje de estado
+        const statusDiv = document.getElementById('qr-cobro-status');
+        if (statusDiv) {
+            statusDiv.textContent = `Generando QR para cobrar $${amount.toFixed(2)}...`;
+            statusDiv.className = "text-center mt-2 text-sm text-yellow-600"; // Color amarillo para "cargando"
+        }
+
+        // Generar el QR inmediatamente después de guardar los datos
+        // Usamos un pequeño timeout para asegurar que el DOM se actualice con el mensaje
+        setTimeout(() => {
+            const container = document.getElementById('qr-cobro-container');
+            if (container) {
+                container.innerHTML = ''; // Limpiar por si acaso
+                container.classList.remove('hidden'); // Mostrar contenedor
+
+                const qrContent = `${receiverId},${amount.toFixed(2)}`;
+
+                try {
+                    // Generar QR con la nueva sintaxis
+                    new QRCode(container, {
+                      text: qrContent, // Contenido: ID_NEGOCIO,MONTO
+                      width: 200,
+                      height: 200,
+                      colorDark: "#000000",
+                      colorLight: "#ffffff",
+                      correctLevel: QRCode.CorrectLevel.H
+                    });
+                    console.log('QR de Pago generado correctamente para cobro.');
+
+                    // Actualizar mensaje de éxito
+                    const statusDiv = document.getElementById('qr-cobro-status');
+                    if (statusDiv) {
+                        statusDiv.textContent = `✅ QR generado para cobrar $${amount.toFixed(2)}.`;
+                        statusDiv.className = "text-center mt-2 text-sm text-green-600"; // Color verde para éxito
+                    }
+
+                } catch (error) {
+                    console.error('Error al generar QR de pago:', error);
+                    const statusDiv = document.getElementById('qr-cobro-status');
+                    if (statusDiv) {
+                        statusDiv.textContent = "Error al generar el QR.";
+                        statusDiv.className = "text-center mt-2 text-sm text-red-600"; // Color rojo para error
+                    }
+                }
+            } else {
+                 console.error('Contenedor QR Cobro no encontrado en generarQRCobro.');
+                 showMessage("Error al generar el QR.", 'error');
+            }
+        }, 100); // Pequeño delay para que se vea el mensaje de "cargando"
     }
 
     function getQRView() {
+      // Crear el contenedor donde se generará el QR
+      const qrContainerHtml = `<div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
+      const html = `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Mi Código QR (Receptor)</h1>
+        </div>
+        <div class="text-center p-4">
+          <h3 class="text-lg font-semibold">${userData?.nombre || 'Desconocido'}</h3>
+          <p class="text-sm text-gray-500 mb-4">ID: <span class="font-mono">${userId}</span></p>
+          ${qrContainerHtml}
+          <div id="qr-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
+          <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
+        </div>
+      `;
+
+      return html;
+    }
+
+    // --- Actualización de la vista QR ---
+    function updateQRView() {
+      if (currentView === 'qr' && userId) {
+        const container = document.getElementById('qr-code-container');
+        const errorDiv = document.getElementById('qr-error-message');
+        
+        if (container) {
+            container.innerHTML = ''; // Limpiar contenedor
+            errorDiv.classList.add('hidden');
+
+            try {
+                // Generar QR con la nueva sintaxis
+                new QRCode(container, {
+                  text: userId, // Contenido: Solo el ID del usuario
+                  width: 200,
+                  height: 200,
+                  colorDark: "#000000",
+                  colorLight: "#ffffff",
+                  correctLevel: QRCode.CorrectLevel.H
+                });
+                console.log('QR de ID generado correctamente.');
+
+            } catch (error) {
+                console.error('Error al generar QR de ID:', error);
+                errorDiv.classList.remove('hidden');
+            }
+        } else {
+            console.error('Contenedor QR o userId no encontrado en updateQRView.');
+        }
+      }
+    }
+
+    function getQRPagoView() {
+        if (!window.tempPagoData) {
+            showMessage("Error: Datos de pago no encontrados.", 'error');
+            switchView('home');
+            return `<div>Error...</div>`;
+        }
+        const { receiverId, amount } = window.tempPagoData;
+        // Buscar negocio en la lista de usuarios (ahora solo tiene negocios)
+        const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
+        const nombreNegocio = negocio.nombre;
+
+        const qrContainerHtml = `<div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
+        const html = `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar Cobro QR</h1>
+        </div>
+        <div class="text-center p-4">
+          <h3 class="text-xl font-semibold text-green-700">Monto: $${amount.toFixed(2)}</h3>
+          <p class="text-sm text-gray-500 mb-2">Para: ${nombreNegocio} (ID: ${receiverId})</p>
+          ${qrContainerHtml}
+          <div id="qr-pago-error-message" class="mt-2 text-red-500 text-sm hidden">Error al generar el QR. Revisa la consola.</div>
+          <p class="mt-4 text-sm text-gray-600">Este QR contiene el ID del Negocio y el monto. El cliente debe escanearlo para iniciar el pago.</p>
+          <button onclick="switchView('home')"
+                  class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+            Volver al Inicio
+          </button>
+        </div>
+      `;
+      return html;
+    }
+
+    // --- Actualización de la vista QR de Pago ---
+    function updateQRPagoView() {
+      if (currentView === 'qrPago' && window.tempPagoData) {
+        const container = document.getElementById('qr-pago-container');
+        const errorDiv = document.getElementById('qr-pago-error-message');
+        
+        if (container) {
+            container.innerHTML = ''; // Limpiar
+            errorDiv.classList.add('hidden');
+
+            const qrContent = `${window.tempPagoData.receiverId},${window.tempPagoData.amount.toFixed(2)}`;
+
+            try {
+                // Generar QR con la nueva sintaxis
+                new QRCode(container, {
+                  text: qrContent, // Contenido: ID_NEGOCIO,MONTO
+                  width: 200,
+                  height: 200,
+                  colorDark: "#000000",
+                  colorLight: "#ffffff",
+                  correctLevel: QRCode.CorrectLevel.H
+                });
+                console.log('QR de Pago generado correctamente.');
+
+            } catch (error) {
+                console.error('Error al generar QR de pago:', error);
+                errorDiv.classList.remove('hidden');
+            }
+        } else {
+            console.error('Contenedor QR Pago o tempPagoData no encontrado.');
+        }
+      }
+    }
+
+    function getTransferView() {
+        return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
+        </div>
+
+        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</span></p>
+        </div>
+
+        <form onsubmit="processTransfer(event)" class="space-y-4">
+          <div>
+            <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario (4 dígitos)</label>
+            <input type="text" id="destinatario-id" placeholder="Ej: 0045" required pattern="^\d{4}$" maxlength="4"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
+            <p class="text-xs text-gray-500 mt-1">El ID del destinatario se muestra en su pantalla de inicio.</p>
+          </div>
+          <div>
+            <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
+            <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
+          
+          <button type="submit"
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Transferir Dinero
+          </button>
+        </form>
+      `;
+    }
+
+    function getEscanearView() {
+        return `
+        <div id="scanner-container">
+            <h1 class="text-2xl font-bold text-white mb-6 text-center z-10">Escanear QR de Negocio</h1>
+            <div class="relative w-full max-w-md mx-auto">
+                <video id="scanner-video" autoplay playsinline muted style="width: 100%; height: auto; max-height: 70vh; object-fit: cover;"></video>
+                <div id="scanner-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 80%; border: 2px solid #00ff00; pointer-events: none;"></div>
+            </div>
+            <div id="scanner-controls" class="z-10 mt-4">
+                <button onclick="switchView('pago')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+                    Cancelar
+                </button>
+            </div>
+            <div id="scanner-message" class="text-center text-white mt-4">Iniciando cámara...</div>
+            <!-- Canvas oculto para procesamiento de jsQR -->
+            <canvas id="scanner-canvas" style="display: none;"></canvas>
+        </div>
+        `;
+    }
+
+    function iniciarEscaneo() {
+        const video = document.getElementById('scanner-video');
+        const canvasElement = document.getElementById('scanner-canvas');
+        const canvas = canvasElement.getContext('2d');
+        const messageDiv = document.getElementById('scanner-message'); // Elemento de mensaje en pantalla
+
+        if (!video) {
+            console.error("Elemento video no encontrado para escaneo.");
+            messageDiv.textContent = "Error: Cámara no encontrada.";
+            messageDiv.className = "text-center text-red-500 mt-4";
+            showMessage("Error al iniciar la cámara.", 'error');
+            switchView('pago');
+            return;
+        }
+
+        scanningActive = true;
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => {
+            videoStream = stream;
+            video.srcObject = stream;
+            video.play();
+            messageDiv.textContent = "Cámara iniciada. Apunta al QR.";
+            messageDiv.className = "text-center text-green-400 mt-4";
+
+            // Función recursiva para escanear continuamente
+            function scan() {
+                if (!scanningActive) return; // Detener si la bandera cambia
+
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvasElement.width = video.videoWidth;
+                    canvasElement.height = video.videoHeight;
+                    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                    const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        console.log("Código QR detectado:", code.data);
+                        messageDiv.textContent = `QR detectado: ${code.data}`;
+                        messageDiv.className = "text-center text-blue-400 mt-4";
+                        detenerEscaneo(); // Detiene la cámara y el bucle de escaneo
+                        procesarCodigoQR(code.data, messageDiv); // Pasa el div de mensaje
+                        return; // Salir de la función scan
+                    }
+                }
+                // Solicitar el próximo frame de escaneo
+                animationFrameId = requestAnimationFrame(scan);
+            }
+
+            // Iniciar el bucle de escaneo
+            scan();
+
+        }).catch(err => {
+            console.error("Error al acceder a la cámara:", err);
+            messageDiv.textContent = `Error: ${err.message || 'No se pudo acceder a la cámara.'}`;
+            messageDiv.className = "text-center text-red-500 mt-4";
+            scanningActive = false; // Asegura que no se intente escanear
+        });
+    }
+
+    function detenerEscaneo() {
+        scanningActive = false; // Cambia la bandera para detener el bucle
+
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+
+        if (videoStream) {
+            const tracks = videoStream.getTracks();
+            tracks.forEach(track => track.stop());
+            videoStream = null;
+        }
+        console.log("Escaneo detenido.");
+    }
+
+    // --- FUNCIÓN ACTUALIZADA para procesar el código QR ---
+    // Recibe también el div de mensaje para mostrar estado
+    function procesarCodigoQR(code, messageDiv) {
+        // Detenemos la cámara inmediatamente para congelar la imagen en el estado de lectura
+        detenerEscaneo();
+
+        // El formato esperado es "ID_NEGOCIO,MONTO"
+        const parts = code.split(',');
+        if (parts.length !== 2) {
+            messageDiv.textContent = "QR inválido: Formato incorrecto.";
+            messageDiv.className = "text-center text-red-500 mt-4";
+            console.error("Código QR inválido, no tiene 2 partes:", code);
+            // Aseguramos que se haya detenido y damos un tiempo antes de volver
+            setTimeout(() => switchView('pago'), 2000); // Espera 2 segundos antes de volver
+            return;
+        }
+
+        const negocioId = parts[0].trim();
+        const montoStr = parts[1].trim();
+
+        // Validar ID (4 dígitos)
+        if (!/^\d{4}$/.test(negocioId)) {
+            messageDiv.textContent = `QR inválido: ID (${negocioId}) incorrecto.`;
+            messageDiv.className = "text-center text-red-500 mt-4";
+            console.error("Código QR inválido: ID no es 4 dígitos:", negocioId);
+            setTimeout(() => switchView('pago'), 2000);
+            return;
+        }
+
+        // Validar Monto
+        const monto = parseFloat(montoStr);
+        if (isNaN(monto) || monto <= 0) {
+            messageDiv.textContent = `QR inválido: Monto (${montoStr}) incorrecto.`;
+            messageDiv.className = "text-center text-red-500 mt-4";
+            console.error("Código QR inválido: Monto no es número válido:", montoStr);
+            setTimeout(() => switchView('pago'), 2000);
+            return;
+        }
+
+        // Verificar si el negocio existe
+        const negocio = usuarios.find(u => u.id === negocioId);
+        if (!negocio) {
+            messageDiv.textContent = `Negocio ID ${negocioId} no encontrado.`;
+            messageDiv.className = "text-center text-red-500 mt-4";
+            console.error("Negocio no encontrado para ID:", negocioId);
+            setTimeout(() => switchView('pago'), 2000);
+            return;
+        }
+
+        // Cargar datos temporalmente en una variable global (o en window)
+        // Esta variable será leída por la vista de pago cuando se renderice
+        window.tempPagoData = { receiverId: negocioId, amount: monto };
+
+        // Mostramos el mensaje de éxito
+        messageDiv.textContent = `✅ Leído: ${negocio.nombre}, $${monto.toFixed(2)}. Cargando...`;
+        messageDiv.className = "text-center text-green-400 mt-4";
+        // Esperamos un momento antes de cambiar de vista para que se vea el mensaje
+        setTimeout(() => {
+            switchView('pago');
+        }, 1500); // Espera 1.5 segundos antes de cambiar de vista
+    }
+
+    function getNotFoundView() {
       return `
-        <div class="text-center">
-          <h1 class="text-2xl font-bold text-gray-800 mb-4">Mi Código QR</h1>
-          <h3 class="text-lg font-semibold">${userData?.nombre}</h3>
-          <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
-          <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-          <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Volver</button>
+        <div class="text-center p-10">
+          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
+          <p class="text-gray-600">Vista no encontrada.</p>
+          <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
+            Volver al inicio
+          </button>
         </div>
       `;
     }
 
-    function getHistorialView() {
-      if (transacciones.length === 0) {
-        return `
-          <div class="text-center">
-            <h1 class="text-2xl font-bold mb-4">Historial</h1>
-            <p class="text-gray-500">No hay transacciones.</p>
-            <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Volver</button>
-          </div>`;
+    window.processPayment = async () => {
+      // No necesitamos el evento aquí
+      
+      const receiverId = document.getElementById('negocio-select').value;
+      const montoInput = document.getElementById('monto-pago').value;
+      const amount = parseFloat(montoInput);
+
+      if (!receiverId || isNaN(amount) || amount <= 0) {
+        showMessage("Selecciona un negocio y un monto válido.", 'error');
+        return;
+      }
+      if (amount > (userData?.saldo || 0)) {
+        showMessage(`Saldo insuficiente. Tu saldo es $${(userData.saldo || 0).toFixed(2)}.`, 'error');
+        return;
       }
 
-      const filas = transacciones.map(t => {
-        const tipo = t.tipo === "venta" ? "Pago" : "Transferencia";
-        const signo = t.emisor === userId ? "-" : "+";
-        const color = t.emisor === userId ? "text-red-600" : "text-green-600";
-        const fecha = new Date(t.fecha.seconds * 1000).toLocaleString();
-        return `
-          <tr class="border-b">
-            <td class="p-2 text-sm">${tipo}</td>
-            <td class="p-2 text-sm">${t.emisor === userId ? "A " + t.receptor : "De " + t.emisor}</td>
-            <td class="p-2 text-sm ${color} font-bold">${signo}$${t.monto.toFixed(2)}</td>
-            <td class="p-2 text-xs text-gray-500">${fecha}</td>
-          </tr>`;
-      }).join("");
+      const senderRef = db.collection("usuarios").doc(userId);
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+      const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
+      const transaccionRef = db.collection("transacciones").doc();
 
-      return `
-        <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">Historial de Transacciones</h1>
-        <div class="overflow-y-auto max-h-96 border rounded-lg">
-          <table class="w-full text-left border-collapse">
-            <thead class="bg-gray-100 sticky top-0">
-              <tr>
-                <th class="p-2 text-sm font-semibold text-gray-700">Tipo</th>
-                <th class="p-2 text-sm font-semibold text-gray-700">Contraparte</th>
-                <th class="p-2 text-sm font-semibold text-gray-700">Monto</th>
-                <th class="p-2 text-sm font-semibold text-gray-700">Fecha</th>
-              </tr>
-            </thead>
-            <tbody>${filas}</tbody>
-          </table>
-        </div>
-        <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Volver</button>
-      `;
-    }
+      try {
+        // Solo los negocios (rol=negocio) pagan 5% de comisión al banco por recibir dinero
+        // Si el emisor es un cliente, no hay comisión de salida.
+        const comision = 0; // Comisión de salida eliminada para clientes
 
-    // === FUNCIÓN PRINCIPAL DE RENDER ===
-    function renderApp() {
-      let content = '';
-      switch (currentView) {
-        case 'home': content = getHomeView(); break;
-        case 'registro': content = getRegistroView(); break;
-        case 'qr': content = getQRView(); break;
-        case 'historial': content = getHistorialView(); break;
-        default: content = `<p>Error de vista.</p>`;
+        await db.runTransaction(async (t) => {
+          const senderDoc = await t.get(senderRef);
+          const receiverDoc = await t.get(receiverRef);
+          const bancoDoc = await t.get(bancoRef);
+
+          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
+
+          // Cálculo de comisión que aplica al *receptor* si es un negocio
+          const isReceiverBusiness = receiverDoc.data().rol === 'negocio';
+          const comisionNegocio = isReceiverBusiness ? amount * 0.05 : 0;
+          const montoFinalNegocio = amount - comisionNegocio; // Lo que el negocio realmente recibe
+
+          // Actualizaciones
+          const newSenderBalance = senderDoc.data().saldo - amount;
+          const newReceiverBalance = receiverDoc.data().saldo + montoFinalNegocio;
+          const newBancoBalance = bancoDoc.data().saldo + comisionNegocio;
+
+          t.update(senderRef, { saldo: newSenderBalance });
+          t.update(receiverRef, { saldo: newReceiverBalance });
+          t.update(bancoRef, { saldo: newBancoBalance }); 
+
+          t.set(transaccionRef, {
+            tipo: "pago_negocio",
+            emisor: userId,
+            receptor: receiverId,
+            monto_total: amount,
+            comision: comisionNegocio,
+            monto_recibido: montoFinalNegocio,
+            fecha: new Date(),
+          });
+        });
+
+        document.getElementById('pago-form').reset();
+        showMessage(`✅ Pago de $${amount.toFixed(2)} exitoso.`, 'success');
+        switchView('home');
+      } catch (e) {
+        console.error("Error en processPayment:", e);
+        showMessage(`Error al procesar el pago.`, 'error');
       }
-      document.getElementById('app-container').innerHTML = content;
-    }
+    };
 
-    // === INICIAR APP ===
+    // Nueva función para transferencia entre usuarios
+    window.processTransfer = async (event) => {
+      event.preventDefault();
+      
+      const receiverId = document.getElementById('destinatario-id').value.trim();
+      const amount = parseFloat(document.getElementById('monto-transfer').value);
+
+      if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
+        showMessage("Ingresa un ID de 4 dígitos y un monto válido.", 'error');
+        return;
+      }
+      if (receiverId === userId) {
+        showMessage("No puedes transferirte dinero a ti mismo.", 'error');
+        return;
+      }
+      if (amount > (userData?.saldo || 0)) {
+        showMessage(`Saldo insuficiente. Tu saldo es $${(userData.saldo || 0).toFixed(2)}.`, 'error');
+        return;
+      }
+
+      const senderRef = db.collection("usuarios").doc(userId);
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+      const transaccionRef = db.collection("transacciones").doc();
+
+      try {
+        // No hay comisión para transferencias entre usuarios
+        await db.runTransaction(async (t) => {
+          const senderDoc = await t.get(senderRef);
+          const receiverDoc = await t.get(receiverRef);
+
+          if (!senderDoc.exists) throw "Emisor no encontrado";
+          if (!receiverDoc.exists) throw `Destinatario (ID: ${receiverId}) no encontrado.`;
+
+          const newSenderBalance = senderDoc.data().saldo - amount;
+          const newReceiverBalance = receiverDoc.data().saldo + amount;
+
+          t.update(senderRef, { saldo: newSenderBalance });
+          t.update(receiverRef, { saldo: newReceiverBalance });
+          t.set(transaccionRef, {
+            tipo: "transferencia_p2p",
+            emisor: userId,
+            receptor: receiverId,
+            monto: amount,
+            comision: 0,
+            fecha: new Date(),
+          });
+        });
+
+        document.getElementById('monto-transfer').value = '';
+        showMessage(`✅ Transferencia de $${amount.toFixed(2)} a ${receiverId} exitosa.`, 'success');
+        switchView('home');
+      } catch (e) {
+        const errorMsg = typeof e === 'string' ? e : "Error desconocido al transferir.";
+        console.error("Error en processTransfer:", e);
+        showMessage(`Error: ${errorMsg}`, 'error');
+      }
+    };
+
+    // Nueva función para generar QR de pago (solo para negocio)
+    window.generarQRPago = () => {
+        if (userData?.rol !== 'negocio') {
+            showMessage("Solo los negocios pueden generar QR de cobro.", 'error');
+            return;
+        }
+        const receiverId = userId; // El negocio es el receptor
+        const amountInput = document.getElementById('monto-pago').value;
+        const amount = parseFloat(amountInput);
+
+        if (isNaN(amount) || amount <= 0) {
+            showMessage("Ingresa un monto válido para generar el cobro.", 'error');
+            return;
+        }
+
+        // Guardar temporalmente los datos del pago (el negocio como receptor)
+        window.tempPagoData = { receiverId, amount };
+        switchView('qrPago');
+    };
+
+    // Función para confirmar pago directamente
+    window.confirmarPago = () => {
+      processPayment();
+    };
+
+    // Iniciar renderizado
     if (db) renderApp();
   </script>
+
 </body>
 </html>
