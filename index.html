@@ -1,11 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Billetera Feria Escolar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -13,7 +10,6 @@
     .currency-display { font-variant-numeric: tabular-nums; }
   </style>
 </head>
-
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
   <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300"></div>
 
@@ -23,7 +19,6 @@
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <script>
-    // === CONFIG FIREBASE ===
     const firebaseConfig = {
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
       authDomain: "feria-escolar-billetera.firebaseapp.com",
@@ -33,36 +28,30 @@
       appId: "1:311026746803:web:fc891c988b9da3faee37c6"
     };
 
-    let db = null, app = null;
-    const BANK_ID = "banco-central";
-    let rol = null, userId = null, userData = null;
+    let app, db, rol, userId, userData;
     let usuarios = [];
     let unsubscribeUsuarios = null;
+    const BANK_ID = "banco-central";
     let currentView = 'loading';
     let message = { text: '', type: '' };
-    let tempPagoData = null;
 
-    // === Inicializar Firebase ===
     try {
       app = firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
     } catch (e) {
-      console.error("Error Firebase:", e);
       document.getElementById("app-container").innerHTML =
-        `<div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">Error al inicializar Firebase.</div>`;
+        `<div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">Error al inicializar Firebase</div>`;
     }
 
-    // === CARGA INICIAL ===
-    window.onload = async () => {
+    window.onload = () => {
       if (!db) return;
-      await setupBanco();
-      const savedId = localStorage.getItem("userId");
-      if (savedId) {
-        userId = savedId;
-        cargarUsuarioExistente();
-      } else {
-        switchView('registro');
-      }
+      setupBanco().then(() => {
+        const savedId = localStorage.getItem("userId");
+        if (savedId) {
+          userId = savedId;
+          cargarUsuarioExistente();
+        } else mostrarFormulario();
+      });
     };
 
     async function setupBanco() {
@@ -89,56 +78,37 @@
           switchView('home');
         } else {
           localStorage.removeItem("userId");
-          switchView('registro');
+          mostrarFormulario();
         }
       });
     }
 
-    function escucharCambios() {
-      if (unsubscribeUsuarios) unsubscribeUsuarios();
-      unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
-        userData = doc.data();
-        if (['home', 'pago', 'transfer', 'qr', 'qrPago'].includes(currentView)) renderApp();
-      });
-    }
+    function mostrarFormulario() { switchView('registro'); }
 
-    function escucharUsuarios() {
-      db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
-        usuarios = [];
-        snap.forEach(doc => usuarios.push({ id: doc.id, ...doc.data() }));
-        if (currentView === 'pago') renderApp();
-      });
-    }
-
-    // === Cambio de vistas ===
-    window.switchView = (view) => {
-      currentView = view;
-      message = { text: '', type: '' };
-      renderApp();
-      if (view === 'qr') setTimeout(() => generarQR(userId, 'qr-code-container'), 0);
-      if (view === 'qrPago' && tempPagoData) setTimeout(() => generarQR(tempPagoData.text, 'qr-pago-container'), 0);
-    };
-
-    const showMessage = (text, type) => {
-      message = { text, type };
-      renderApp();
-    };
-
-    // === Crear nuevo usuario ===
     async function iniciarUsuario() {
+      const btn = document.getElementById("btn-guardar");
+      btn.disabled = true;
+      btn.textContent = "Creando usuario...";
       const nombre = document.getElementById("nombre-usuario").value.trim();
-      if (!nombre) return alert("Ingresa un nombre");
+      if (!nombre) {
+        alert("Ingresa un nombre");
+        btn.disabled = false;
+        btn.textContent = "Guardar y Entrar";
+        return;
+      }
 
       let nuevoId = null;
-      for (let i = 1; i < 10000; i++) {
-        const id = String(i).padStart(4, '0');
-        const ref = db.collection("usuarios").doc(id);
-        const doc = await ref.get();
+      let intentos = 0;
+
+      while (nuevoId === null && intentos < 10000) {
+        intentos++;
+        const id = String(intentos).padStart(4, '0');
+        const docRef = db.collection("usuarios").doc(id);
+        const doc = await docRef.get();
         if (!doc.exists) {
           nuevoId = id;
-          await ref.set({
-            nombre,
-            rol,
+          await docRef.set({
+            nombre, rol,
             saldo: rol === 'cliente' ? 500 : 0,
             qrId: id,
             createdAt: new Date()
@@ -152,142 +122,121 @@
           break;
         }
       }
-      if (!nuevoId) alert("No se pudo asignar un ID disponible.");
+      if (!nuevoId) alert("No se pudo asignar un ID.");
     }
 
-    // === Generar QR genérico ===
-    function generarQR(texto, containerId) {
-      const cont = document.getElementById(containerId);
-      if (!cont) return;
-      cont.innerHTML = '';
-      new QRCode(cont, { text: texto, width: 200, height: 200 });
+    function escucharCambios() {
+      if (unsubscribeUsuarios) unsubscribeUsuarios();
+      unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
+        userData = doc.data();
+        if (['home', 'pago', 'transfer'].includes(currentView)) renderApp();
+      });
     }
 
-    // === RENDER ===
+    function escucharUsuarios() {
+      db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
+        usuarios = [];
+        snap.forEach(doc => usuarios.push({ id: doc.id, ...doc.data() }));
+        if (currentView === 'pago') renderApp();
+      });
+    }
+
+    function showMessage(text, type) { message = { text, type }; renderApp(); }
+
+    window.switchView = (newView) => {
+      currentView = newView;
+      message = { text: '', type: '' };
+      renderApp();
+      if (newView === 'qr') {
+        setTimeout(() => {
+          const container = document.getElementById('qr-code-container');
+          if (container && userId) {
+            container.innerHTML = '';
+            new QRCode(container, { text: userId, width: 200, height: 200 });
+          }
+        }, 0);
+      }
+    };
+
     function renderApp() {
-      const views = {
-        home: getHomeView,
-        registro: getRegistroView,
-        pago: getPagoView,
-        qr: getQRView,
-        transfer: getTransferView,
-        qrPago: getQRPagoView,
-        loading: () => `
-          <div class="flex flex-col items-center justify-center p-10">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-            <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando...</p>
-          </div>`
-      };
-      const viewFunc = views[currentView];
-      document.getElementById('app-container').innerHTML = viewFunc ? viewFunc() : `<p class='text-red-500 text-center'>Error en la vista</p>`;
+      let content = '';
+      if (currentView === 'loading') {
+        content = `<div class="p-6 text-center text-indigo-700">Cargando...</div>`;
+      } else {
+        switch (currentView) {
+          case 'home': content = getHomeView(); break;
+          case 'registro': content = getRegistroView(); break;
+          case 'pago': content = getPagoView(); break;
+          case 'transfer': content = getTransferView(); break;
+          case 'qr': content = getQRView(); break;
+          case 'qrPago': content = getQRPagoView(); break;
+          default: content = `<div class="p-6 text-center text-red-600">Error en la vista.</div>`; break;
+        }
+      }
+      document.getElementById('app-container').innerHTML = content;
     }
 
-    // === VISTAS ===
     function getHomeView() {
-      if (!userData) return `<div class="text-center p-8">Cargando datos...</div>`;
-      const saldo = userData.saldo?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0.00';
-      const botonNegocio = userData.rol === 'negocio'
-        ? `<button onclick="switchView('qrPago')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">Generar QR de Pago</button>`
-        : '';
+      const saldoFmt = (userData?.saldo || 0).toLocaleString('es-CL', { minimumFractionDigits: 2 });
       return `
-        <h1 class="text-3xl font-bold text-center mb-6">Feria Escolar - Billetera</h1>
-        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center">
-          <p class="text-sm">Saldo disponible</p>
-          <p class="text-4xl font-black text-indigo-900 currency-display">$${saldo}</p>
-          <p class="text-xs text-gray-500 mt-2">ID: ${userId}</p>
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
+        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
+          <p class="text-sm text-indigo-700">Tu Saldo (Rol: ${userData?.rol})</p>
+          <p class="text-4xl font-black text-indigo-900 currency-display">$${saldoFmt}</p>
+          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono">${userId}</span></p>
         </div>
-        <div class="space-y-3">
-          <button onclick="switchView('qr')" class="w-full bg-indigo-600 text-white py-3 rounded-lg">Mi QR</button>
-          <button onclick="switchView('pago')" class="w-full bg-green-600 text-white py-3 rounded-lg">Pagar</button>
-          <button onclick="switchView('transfer')" class="w-full bg-gray-600 text-white py-3 rounded-lg">Transferir</button>
-          ${botonNegocio}
+        <div class="space-y-4">
+          <button onclick="switchView('qr')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Mi QR</button>
+          <button onclick="switchView('pago')" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Pagar</button>
+          <button onclick="switchView('transfer')" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Transferir</button>
+          ${rol === 'negocio' ? `<button onclick="switchView('qrPago')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Generar QR de Pago</button>` : ''}
         </div>
       `;
     }
 
     function getRegistroView() {
       return `
-        <h1 class="text-2xl font-bold mb-4 text-gray-800 text-center">Registrar Usuario</h1>
-        <input id="nombre-usuario" placeholder="Ingresa tu nombre" class="w-full border border-gray-300 rounded-md p-3 mb-3">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Registrar Usuario</h1>
+        <input type="text" id="nombre-usuario" placeholder="Ingresa tu nombre" class="block w-full border border-gray-300 rounded-md shadow-sm p-3 mb-3">
         <div class="space-y-2">
-          <button onclick="rol='cliente'; iniciarUsuario()" class="w-full bg-green-600 text-white py-3 rounded-lg">Soy Cliente</button>
-          <button onclick="rol='negocio'; iniciarUsuario()" class="w-full bg-indigo-600 text-white py-3 rounded-lg">Soy Negocio</button>
+          <button onclick="rol='cliente'; iniciarUsuario()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">Soy Cliente</button>
+          <button onclick="rol='negocio'; iniciarUsuario()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-lg">Soy Negocio</button>
         </div>
       `;
     }
 
     function getQRView() {
       return `
-        <div class="text-center">
-          <h1 class="text-2xl font-bold mb-4">Mi Código QR</h1>
-          <p class="font-semibold">${userData?.nombre || ''}</p>
-          <p class="text-gray-500 mb-4">ID: ${userId}</p>
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Mi Código QR</h1>
+        <div class="text-center p-4">
+          <h3 class="text-lg font-semibold">${userData?.nombre}</h3>
+          <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
           <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-          <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 text-white py-2 rounded-lg">Volver</button>
         </div>
       `;
     }
 
-    function getPagoView() {
-      const negocios = usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('') || '<option>No hay negocios</option>';
-      return `
-        <h1 class="text-2xl font-bold mb-4">Pagar</h1>
-        <form onsubmit="processPayment(event)" class="space-y-3">
-          <select id="negocio-select" class="w-full border p-3 rounded" required>
-            <option value="">Selecciona un negocio</option>${negocios}
-          </select>
-          <input id="monto-pago" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
-          <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Confirmar Pago</button>
-        </form>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
-      `;
-    }
-
-    function getTransferView() {
-      return `
-        <h1 class="text-2xl font-bold mb-4">Transferir Dinero</h1>
-        <form onsubmit="processTransfer(event)" class="space-y-3">
-          <input id="destinatario-id" placeholder="ID destino (4 dígitos)" maxlength="4" class="w-full border p-3 rounded" required pattern="[0-9]{4}">
-          <input id="monto-transfer" type="number" min="0.01" step="0.01" placeholder="Monto" class="w-full border p-3 rounded" required>
-          <button type="submit" class="w-full bg-green-600 text-white py-3 rounded">Transferir</button>
-        </form>
-        <button onclick="switchView('home')" class="w-full bg-gray-500 text-white py-2 mt-4 rounded">Volver</button>
-      `;
-    }
-
-    // === NUEVA VISTA QR DE PAGO (solo negocios) ===
     function getQRPagoView() {
-      const monto = tempPagoData?.monto || '';
-      const qrVisible = tempPagoData ? 'block' : 'hidden';
       return `
-        <h1 class="text-2xl font-bold mb-4 text-center">Generar QR de Pago</h1>
-        <form onsubmit="generarQrDePago(event)" class="space-y-3 text-center">
-          <input id="monto-qr" type="number" step="0.01" min="0.01" placeholder="Monto ($)" class="w-full border p-3 rounded" required>
-          <button type="submit" class="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg">Generar</button>
-        </form>
-        <div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white mt-4 ${qrVisible}"></div>
-        <button onclick="switchView('home')" class="mt-4 w-full bg-gray-500 text-white py-2 rounded-lg">Volver</button>
+        <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">Generar QR de Pago</h1>
+        <div class="space-y-4 text-center">
+          <input type="number" id="monto-qr" placeholder="Monto en $" min="0.01" step="0.01" class="w-full border border-gray-300 rounded-md shadow-sm p-3">
+          <button onclick="generarQrDePago()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg">Generar</button>
+          <div id="qr-pago-container" class="flex justify-center mt-4"></div>
+        </div>
       `;
     }
 
-    // === Función para generar QR de pago ===
-    window.generarQrDePago = (e) => {
-      e.preventDefault();
+    function generarQrDePago() {
       const monto = parseFloat(document.getElementById('monto-qr').value);
+      const container = document.getElementById('qr-pago-container');
+      container.innerHTML = '';
       if (isNaN(monto) || monto <= 0) {
-        showMessage("Monto inválido", "error");
+        container.innerHTML = '<p class="text-red-600">Ingrese un monto válido.</p>';
         return;
       }
-      const texto = `${userId},${monto.toFixed(2)}`;
-      tempPagoData = { monto, text: texto };
-      switchView('qrPago');
-    };
-
-    // === FUNCIONES DE NEGOCIO === (pago y transfer)
-    window.processPayment = async (e) => { /* igual que antes */ };
-    window.processTransfer = async (e) => { /* igual que antes */ };
-
-    if (db) renderApp();
+      new QRCode(container, { text: `${userId},${monto.toFixed(2)}`, width: 200, height: 200 });
+    }
   </script>
 </body>
 </html>
