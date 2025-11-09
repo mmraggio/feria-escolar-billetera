@@ -1,4 +1,5 @@
- <!DOCTYPE html>
+```html
+<!DOCTYPE html>
 
 <html lang="es">
 
@@ -7,16 +8,14 @@
   <meta charset="UTF-8" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
   <meta name="apple-mobile-web-app-capable" content="yes">
-
   <meta name="mobile-web-app-capable" content="yes">
 
   <title>Billetera Feria Escolar</title>
 
   <!-- Carga de Tailwind CSS -->
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com  "></script>
 
   <style>
 
@@ -40,14 +39,14 @@
 
   <!-- Scripts de Firebase -->
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
 
 
   <!-- Librería QRCode.js -->
 
-  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js  "></script>
 
 
   <script>
@@ -350,7 +349,7 @@
 
         userData = doc.data();
 
-        if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer') renderApp();
+        if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer' || currentView === 'genera_qr_pago') renderApp();
 
       });
 
@@ -374,7 +373,8 @@
         });
 
         if (currentView === 'pago') renderApp();
-
+        // Actualizar la vista de generación de QR si es necesario
+        if (currentView === 'genera_qr_pago') renderApp();
       });
 
     }
@@ -448,6 +448,10 @@
 
             break;
 
+          case 'genera_qr_pago': // Nueva vista
+            content = getGeneraQRPagoView();
+            break;
+
           default:
 
             content = getNotFoundView();
@@ -492,7 +496,6 @@
         }
 
       }
-
     };
 
 
@@ -514,7 +517,6 @@
       renderApp();
 
       
-
       // Generar QR después de que el DOM esté listo
 
       if (newView === 'qr') {
@@ -562,7 +564,6 @@
       }
 
       
-
       // Generar QR de pago
 
       if (newView === 'qrPago') {
@@ -610,7 +611,6 @@
         }, 0);
 
       }
-
     };
 
 
@@ -672,16 +672,6 @@
 
           </button>
           
-          <!-- Botón de Transferencia entre Usuarios -->
-
-          <button onclick="switchView('genera_qr')"
-
-                  class="w-full bg-yellow-500 hover:bg-yellow-200 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
-
-            Generar QR
-
-          </button>
-
         </div>
 
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
@@ -816,8 +806,14 @@
             Confirmar Pago
 
           </button>
-
         </form>
+
+        <div class="mt-4">
+          <button onclick="switchView('genera_qr_pago')"
+                  class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR de Pago
+          </button>
+        </div>
 
       `;
 
@@ -991,79 +987,71 @@
 
     }
 
+    // Nueva vista para generar QR de pago
+    function getGeneraQRPagoView() {
+      const negocioOptions = usuarios.length > 0
+        ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
+        : '<option value="">No hay negocios disponibles</option>';
 
-    function getNotFoundView() {
-
-      return `
-
-        <div class="text-center p-10">
-
-          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
-
-          <p class="text-gray-600">Vista no encontrada.</p>
-
-          <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
-
-            Volver al inicio
-
-          </button>
-
-        </div>
-
-      `;
-
-    }
-        function getGeneraQRView() {
       return `
         <div class="flex items-center mb-6">
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+          <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           </button>
-          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Pago</h1>
         </div>
 
-        <form onsubmit="generarQRCobro(event)" class="space-y-4">
+        <form id="genera-qr-form" class="space-y-4">
           <div>
-            <label for="monto-cobro" class="block text-sm font-medium text-gray-700">Monto a Cobrar ($)</label>
-            <input type="number" id="monto-cobro" placeholder="10.00" required step="0.01" min="0.01"
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500">
+            <label for="negocio-select-qr" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
+            <select id="negocio-select-qr" required
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+              <option value="">-- Selecciona un negocio --</option>
+              ${negocioOptions}
+            </select>
           </div>
-          
+          <div>
+            <label for="monto-qr" class="block text-sm font-medium text-gray-700">Monto ($)</label>
+            <input type="number" id="monto-qr" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          </div>
           <button type="submit"
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-            Generar QR de Cobro
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR
           </button>
         </form>
-
-        ${window.qrCobroGenerado ? `
-          <div class="mt-6 text-center p-4 border-2 border-yellow-400 rounded-lg bg-yellow-50">
-            <h3 class="text-lg font-semibold mb-2">QR de Cobro Generado</h3>
-            <p class="text-sm text-gray-600 mb-2">Monto: <span class="font-bold">$${window.montoQRCobro?.toFixed(2)}</span></p>
-            <div id="qr-cobro-container" class="flex justify-center p-4 bg-white rounded-lg"></div>
-            <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagarte.</p>
-          </div>
-        ` : ''}
       `;
     }
+
 
     function getNotFoundView() {
+
       return `
+
         <div class="text-center p-10">
+
           <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
+
           <p class="text-gray-600">Vista no encontrada.</p>
+
           <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
+
             Volver al inicio
+
           </button>
+
         </div>
+
       `;
+
     }
+
 
     window.processPayment = async (event) => {
 
       event.preventDefault();
 
       
-
       // Deshabilitar el botón inmediatamente
 
       const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -1079,7 +1067,6 @@
       }
 
       
-
       const receiverId = document.getElementById('negocio-select').value;
 
       const amount = parseFloat(document.getElementById('monto-pago').value);
@@ -1187,8 +1174,8 @@
 
 
         showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
-
-        switchView('home');
+        // Volver a la pantalla principal después de un pago exitoso
+        setTimeout(() => switchView('home'), 2000); // 2 segundos de espera
 
       } catch (e) {
 
@@ -1211,6 +1198,26 @@
       }
 
     };
+
+    // Nueva función para manejar la generación del QR
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('genera-qr-form')?.addEventListener('submit', function(event) {
+        event.preventDefault(); // Evitar recarga de página
+
+        const receiverId = document.getElementById('negocio-select-qr').value;
+        const amount = parseFloat(document.getElementById('monto-qr').value);
+
+        if (!receiverId || isNaN(amount) || amount <= 0) {
+          showMessage("Selecciona un negocio y un monto válido.", 'error');
+          return;
+        }
+
+        // Guardar datos temporalmente
+        window.tempPagoData = { receiverId, amount };
+        // Cambiar a la vista que muestra el QR
+        switchView('qrPago');
+      });
+    });
 
 
     // Nueva función para transferencia entre usuarios
@@ -1306,4 +1313,5 @@
 
 </body>
 
-</html> 
+</html>
+```
