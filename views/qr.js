@@ -1,9 +1,6 @@
-// views/qr.js
-
 // --- FUNCIÓN ACTUALIZADA getQRView ---
 function getQRView() {
   // Crear el contenedor donde se generará el QR
-  // Usamos un div con un ID específico y un borde para visualizarlo
   const qrContainerHtml = `<div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>`;
   const html = `
     <div class="flex items-center mb-6">
@@ -26,48 +23,32 @@ function getQRView() {
 
 // --- Actualización de la vista QR ---
 function updateQRView() {
-  // Aseguramos que userId esté definido y que estemos en la vista correcta
   if (currentView === 'qr' && userId) {
-    const container = document.getElementById('qr-code-container'); // Usamos el ID correcto
+    const container = document.getElementById('qr-code-container');
     const errorDiv = document.getElementById('qr-error-message');
     
     if (container) {
-        // Limpiar el contenedor por si ya contenía un QR anterior
-        container.innerHTML = '';
-        // Ocultar mensaje de error previo
+        container.innerHTML = ''; // Limpiar contenedor
         errorDiv.classList.add('hidden');
 
-        // Verificar si la librería QRCode está disponible
-        if (typeof QRCode === 'undefined') {
-            console.error('Librería QRCode no encontrada.');
-            errorDiv.textContent = 'Error: Librería QRCode no encontrada.';
-            errorDiv.classList.remove('hidden');
-            return;
-        }
-
         try {
-            // Generar QR con la nueva sintaxis de qrcode.js
-            // El primer argumento es el contenedor DOM (o su ID como string)
-            // El segundo argumento es un objeto de opciones
+            // Generar QR con la nueva sintaxis
             new QRCode(container, {
               text: userId, // Contenido: Solo el ID del usuario
-              width: 200,   // Ancho del QR
-              height: 200,  // Alto del QR
-              colorDark: "#000000", // Color de los cuadrados
-              colorLight: "#ffffff", // Color de fondo
-              correctLevel: QRCode.CorrectLevel.H // Nivel de corrección de errores
+              width: 200,
+              height: 200,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
             });
-            console.log('QR de ID generado correctamente en #qr-code-container.');
+            console.log('QR de ID generado correctamente.');
 
         } catch (error) {
             console.error('Error al generar QR de ID:', error);
-            errorDiv.textContent = 'Error al generar el QR.';
             errorDiv.classList.remove('hidden');
         }
     } else {
-        console.error('Contenedor QR (id: qr-code-container) no encontrado en updateQRView o userId no está definido.');
+        console.error('Contenedor QR o userId no encontrado en updateQRView.');
     }
-  } else {
-      console.error('updateQRView llamado pero currentView !== "qr" o userId no está definido.');
   }
 }
