@@ -1,4 +1,4 @@
-5<!DOCTYPE html>
+6<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -12,6 +12,7 @@
     .currency-display { font-variant-numeric: tabular-nums; }
   </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
   <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300"></div>
 
@@ -20,6 +21,7 @@
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <script>
+    // === Configuración Firebase ===
     const firebaseConfig = {
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
       authDomain: "feria-escolar-billetera.firebaseapp.com",
@@ -43,23 +45,29 @@
 
     const BANK_ID = "banco-central";
     let rol = null, userId = null, userData = null, usuarios = [], unsubscribeUsuarios = null;
+    let currentView = 'loading', message = { text: '', type: '' };
 
+    // === Pantalla de carga al iniciar ===
     window.onload = () => {
+      renderApp();
       if (!db) return;
       setupBanco().then(() => {
         const savedId = localStorage.getItem("userId");
-        if (savedId) {
-          userId = savedId;
-          cargarUsuarioExistente();
-        } else {
-          mostrarFormulario();
-        }
+        setTimeout(() => {  // pequeña demora para mostrar animación
+          if (savedId) {
+            userId = savedId;
+            cargarUsuarioExistente();
+          } else {
+            mostrarFormulario();
+          }
+        }, 1000);
       }).catch(e => {
         console.error("Error al crear banco:", e);
         showMessage("Error al inicializar banco.", 'error');
       });
     };
 
+    // === Banco por defecto ===
     async function setupBanco() {
       const bancoRef = db.collection("usuarios").doc(BANK_ID);
       const doc = await bancoRef.get();
@@ -71,10 +79,10 @@
           qrId: BANK_ID,
           createdAt: new Date()
         });
-        console.log("Banco Nacional creado automáticamente.");
       }
     }
 
+    // === Cargar usuario existente ===
     function cargarUsuarioExistente() {
       db.collection("usuarios").doc(userId).get().then(doc => {
         if (doc.exists) {
@@ -96,6 +104,7 @@
 
     function mostrarFormulario() { switchView('registro'); }
 
+    // === Crear nuevo usuario ===
     async function iniciarUsuario() {
       const btn = document.getElementById("btn-guardar");
       if (!btn) return;
@@ -113,31 +122,23 @@
         intentos++;
         const id = String(intentos).padStart(4, '0');
         const docRef = db.collection("usuarios").doc(id);
-        try {
-          const doc = await docRef.get();
-          if (!doc.exists) {
-            nuevoId = id;
-            await docRef.set({
-              nombre,
-              rol,
-              saldo: rol === 'cliente' ? 500 : 0,
-              qrId: id,
-              createdAt: new Date()
-            });
-            localStorage.setItem("userId", id);
-            userId = id;
-            userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
-            escucharCambios();
-            escucharUsuarios();
-            switchView('home');
-            break;
-          }
-        } catch (e) {
-          console.error("Error al crear usuario:", e);
-          alert("Hubo un error al crear el usuario. Inténtalo de nuevo.");
-          btn.disabled = false;
-          btn.textContent = "Guardar y Entrar";
-          return;
+        const doc = await docRef.get();
+        if (!doc.exists) {
+          nuevoId = id;
+          await docRef.set({
+            nombre,
+            rol,
+            saldo: rol === 'cliente' ? 500 : 0,
+            qrId: id,
+            createdAt: new Date()
+          });
+          localStorage.setItem("userId", id);
+          userId = id;
+          userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
+          escucharCambios();
+          escucharUsuarios();
+          switchView('home');
+          break;
         }
       }
       if (!nuevoId) {
@@ -147,6 +148,7 @@
       }
     }
 
+    // === Escuchar actualizaciones de usuario ===
     function escucharCambios() {
       if (unsubscribeUsuarios) unsubscribeUsuarios();
       unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
@@ -155,6 +157,7 @@
       });
     }
 
+    // === Escuchar lista de negocios ===
     function escucharUsuarios() {
       db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
         usuarios = [];
@@ -163,11 +166,11 @@
       });
     }
 
-    let currentView = 'loading', message = { text: '', type: '' };
-
+    // === Renderizado ===
     const renderApp = () => {
       let content = '';
       switch (currentView) {
+        case 'loading': content = getLoadingView(); break;
         case 'home': content = getHomeView(); break;
         case 'registro': content = getRegistroView(); break;
         case 'pago': content = getPagoView(); break;
@@ -177,38 +180,25 @@
         default: content = getNotFoundView(); break;
       }
       document.getElementById('app-container').innerHTML = content;
-      if (message.text) {
-        const el = document.getElementById('app-message');
-        if (el) {
-          const base = "mt-4 p-3 rounded-lg text-sm font-medium transition-opacity duration-500 ease-in-out";
-          const cls = message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-          el.className = `${base} ${cls}`;
-          el.textContent = message.text;
-          el.style.opacity = 1;
-          setTimeout(() => { message.text = ''; el.style.opacity = 0; }, 4000);
-        }
-      }
     };
 
     const showMessage = (text, type) => { message = { text, type }; renderApp(); };
 
+    // === Cambio de vistas ===
     window.switchView = (newView) => {
       currentView = newView;
-      message = { text: '', type: '' };
       renderApp();
 
-      // Mi QR
       if (newView === 'qr') {
         setTimeout(() => {
           const container = document.getElementById('qr-code-container');
           if (container && userId) {
             container.innerHTML = '';
-            new QRCode(container, { text: userId, width: 200, height: 200, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.H });
+            new QRCode(container, { text: userId, width: 200, height: 200 });
           }
         }, 0);
       }
 
-      // QR de cobro (negocios)
       if (newView === 'genera_qr') {
         setTimeout(() => {
           const container = document.getElementById("qr-cobro-container");
@@ -217,18 +207,21 @@
           if (container && window.tempCobroData) {
             const { negocioId, monto } = window.tempCobroData;
             container.innerHTML = "";
-            new QRCode(container, {
-              text: `${negocioId},${monto.toFixed(2)}`,
-              width: 200,
-              height: 200,
-              colorDark: "#000000",
-              colorLight: "#ffffff",
-              correctLevel: QRCode.CorrectLevel.H
-            });
+            new QRCode(container, { text: `${negocioId},${monto.toFixed(2)}`, width: 200, height: 200 });
           }
         }, 0);
       }
     };
+
+    // === Vistas ===
+    function getLoadingView() {
+      return `
+        <div class="flex flex-col items-center justify-center p-10">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+          <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando la aplicación...</p>
+          <p class="text-sm text-gray-500 mt-2">Por favor, espera un momento</p>
+        </div>`;
+    }
 
     function getHomeView() {
       const formatCurrency = (v) => v.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -244,8 +237,7 @@
           <button onclick="switchView('pago')" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Pagar</button>
           <button onclick="switchView('transfer')" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Transferir</button>
           ${rol === 'negocio' ? `<button onclick="switchView('genera_qr')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Generar QR</button>` : ''}
-        </div>
-        <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>`;
+        </div>`;
     }
 
     function getGeneraQRView() {
@@ -259,11 +251,11 @@
           </button>
           <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
         </div>
-    
-        <!-- 🔹 Mover QR arriba -->
+
+        <!-- QR ahora arriba -->
         <div id="qr-cobro-container"
              class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-    
+
         <div class="space-y-4">
           <label class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
           <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
@@ -272,8 +264,7 @@
                   class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
             Generar QR
           </button>
-        </div>
-      `;
+        </div>`;
     }
 
     function generarQRCobro() {
