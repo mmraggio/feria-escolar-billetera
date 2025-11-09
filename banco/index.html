@@ -28,7 +28,7 @@
 
         <div id="error-message" class="hidden p-6 bg-red-100 text-red-800 rounded-lg mt-8">
             <p class="font-bold">Hubo un error al cargar los datos.</p>
-            <p class="text-sm mt-2">Por favor, revisa la Consola del Navegador (F12) para ver el mensaje de error de Firebase, que podría contener un enlace para crear el índice necesario.</p>
+            <p class="text-sm mt-2">Por favor, revisa la Consola del Navegador (F12) para ver el mensaje de error de Firebase.</p>
         </div>
         
     </div>
@@ -77,15 +77,16 @@
             
             try {
                 loadingDiv.classList.add("hidden");
-
-                // 2. Cargar el mapa de usuarios (ID -> Nombre)
+                errorDiv.classList.add("hidden"); // Ocultar mensaje de error anterior
+                container.classList.add("hidden");
+                
+                // 1. Cargar el mapa de usuarios (ID -> Nombre)
                 const usersSnapshot = await db.collection("usuarios").get();
                 usersSnapshot.forEach(doc => {
                     userMap[doc.id] = doc.data().nombre;
                 });
                 
-                // 3. Cargar las transacciones, ordenadas por fecha descendente
-                // ESTA ES LA CONSULTA QUE PODRÍA REQUERIR UN ÍNDICE
+                // 2. Cargar las transacciones, ordenadas por fecha descendente
                 const transactionsSnapshot = await db.collection("transacciones")
                     .orderBy("fecha", "desc")
                     .get();
@@ -95,18 +96,20 @@
                     transactions.push(doc.data());
                 });
 
-                // 4. Renderizar la tabla
+                // 3. Renderizar la tabla
                 renderTransactions(transactions);
 
             } catch (e) {
-                console.error("Error al cargar transacciones (posiblemente falta índice):", e);
+                console.error("Error al cargar transacciones:", e);
                 container.classList.add("hidden");
                 
                 // Mostrar el error detallado
                 errorDiv.classList.remove("hidden");
                 errorDiv.innerHTML = `
                     <p class="font-bold">Error al cargar los datos.</p>
-                    <p class="text-sm mt-2">El problema es casi seguro un **índice de Firestore** faltante. Revisa la Consola (F12) para encontrar el enlace de creación del índice (empieza con **'https://console.firebase.google.com/...'**).</p>
+                    <p class="text-sm mt-2">
+                        El error puede ser por un **índice de Firestore** faltante (revisa la consola en busca de un enlace) o por un dato corrupto.
+                    </p>
                     <p class="text-xs mt-2 break-all">Detalle de error: ${e.message || e}</p>
                 `;
             }
@@ -120,10 +123,26 @@
                 return;
             }
 
-            const formatCurrency = (value) => value.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const formatCurrency = (value) => {
+                // Se asegura de que el valor sea un número antes de formatear
+                if (typeof value !== 'number' || isNaN(value)) return '$0.00'; 
+                return value.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+            
+            // FUNCIÓN CORREGIDA para manejar valores nulos/undefined
             const formatDate = (date) => {
                 if (!date || !date.toDate) return 'N/A';
-                return date.toDate().toLocaleString('es-CL', {
+                
+                let dateObject;
+                try {
+                    // Intenta convertir el Timestamp de Firebase a Date
+                    dateObject = date.toDate();
+                } catch (e) {
+                    console.error("Error al convertir fecha:", e);
+                    return 'Fecha Inválida';
+                }
+                
+                return dateObject.toLocaleString('es-CL', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
@@ -152,19 +171,22 @@
             transactions.forEach(t => {
                 const emisorNombre = userMap[t.emisor] || `ID: ${t.emisor}`;
                 const receptorNombre = userMap[t.receptor] || `ID: ${t.receptor}`;
-                const montoRecibido = t.monto - t.comision;
+                // Se asegura que monto y comisión existan para el cálculo
+                const monto = t.monto || 0; 
+                const comision = t.comision || 0;
+                const montoRecibido = monto - comision;
 
                 // Estilo para destacar la fila de la comisión
-                const rowClass = t.comision > 0 ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50';
+                const rowClass = comision > 0 ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50';
                 
                 tableHTML += `
                     <tr class="${rowClass}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(t.fecha)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 capitalize">${t.tipo}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${emisorNombre} <span class="text-xs text-gray-400">(${t.emisor})</span></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${receptorNombre} <span class="text-xs text-gray-400">(${t.receptor})</span></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right text-indigo-600">${formatCurrency(t.monto)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${t.comision > 0 ? 'text-red-500 font-bold' : 'text-gray-500'}">${formatCurrency(t.comision)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 capitalize">${t.tipo || 'Desconocido'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${emisorNombre} <span class="text-xs text-gray-400">(${t.emisor || 'N/A'})</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${receptorNombre} <span class="text-xs text-gray-400">(${t.receptor || 'N/A'})</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right text-indigo-600">${formatCurrency(monto)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${comision > 0 ? 'text-red-500 font-bold' : 'text-gray-500'}">${formatCurrency(comision)}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-right text-green-600">${formatCurrency(montoRecibido)}</td>
                     </tr>
                 `;
