@@ -1,3 +1,5 @@
+// views/qr.js
+
 // --- FUNCIÓN ACTUALIZADA getQRView ---
 function getQRView() {
   // Crear el contenedor donde se generará el QR
@@ -17,39 +19,48 @@ function getQRView() {
       <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
     </div>
   `;
+
   return html;
 }
 
 // --- Actualización de la vista QR ---
 function updateQRView() {
+  // Verificar si la vista actual es 'qr' y si userId está definido
   if (currentView === 'qr' && userId) {
-    // Esperar a que el DOM esté listo usando setTimeout
-    setTimeout(() => {
-      const container = document.getElementById('qr-code-container');
-      const errorDiv = document.getElementById('qr-error-message');
-      
-      if (container) {
-        container.innerHTML = ''; // Limpiar contenedor
-        if (errorDiv) errorDiv.classList.add('hidden');
-        
+    const container = document.getElementById('qr-code-container');
+    const errorDiv = document.getElementById('qr-error-message');
+
+    if (container) {
+        // Limpiar el contenedor antes de generar un nuevo QR
+        container.innerHTML = '';
+        // Ocultar mensaje de error previo
+        errorDiv.classList.add('hidden');
+
+        // Contenido del QR: Solo el ID del usuario
+        const qrContent = userId;
+
         try {
-          // Generar QR con la nueva sintaxis
-          new QRCode(container, {
-            text: userId, // Contenido: Solo el ID del usuario
-            width: 200,
-            height: 200,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-          });
-          console.log('QR de ID generado correctamente.');
+            // Generar QR con la nueva sintaxis de qrcode.js
+            new QRCode(container, {
+              text: qrContent, // Contenido del QR
+              width: 200,      // Ancho del QR
+              height: 200,     // Alto del QR
+              colorDark: "#000000", // Color de los cuadrados
+              colorLight: "#ffffff", // Color de fondo
+              correctLevel: QRCode.CorrectLevel.H // Nivel de corrección de errores
+            });
+            console.log('QR de ID generado correctamente en #qr-code-container.');
+
         } catch (error) {
-          console.error('Error al generar QR de ID:', error);
-          if (errorDiv) errorDiv.classList.remove('hidden');
+            console.error('Error al generar QR de ID:', error);
+            // Mostrar mensaje de error en la UI
+            errorDiv.classList.remove('hidden');
         }
-      } else {
-        console.error('Contenedor QR no encontrado en updateQRView.');
-      }
-    }, 0); // El timeout de 0ms permite que el DOM se actualice primero
+    } else {
+         console.error('Contenedor QR o userId no encontrado en updateQRView o currentView no es "qr".');
+         if (!container) console.error('Elemento #qr-code-container no encontrado en el DOM.');
+         if (!userId) console.error('userId no está definido.');
+    }
   }
+  // Si no es la vista 'qr' o no hay userId, no hacemos nada.
 }
