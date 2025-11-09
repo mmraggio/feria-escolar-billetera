@@ -1,16 +1,29 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
+
   <meta charset="UTF-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
   <meta name="apple-mobile-web-app-capable" content="yes">
+
   <meta name="mobile-web-app-capable" content="yes">
+
   <title>Billetera Feria Escolar</title>
+
   <!-- Carga de Tailwind CSS -->
+
   <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
+
     body { font-family: 'Inter', sans-serif; }
+
     .currency-display { font-variant-numeric: tabular-nums; }
+
   </style>
 
 </head>
@@ -435,12 +448,6 @@
 
             break;
 
-          case 'genera_qr':
-
-            content = getGeneraQRView();
-
-            break;
-
           default:
 
             content = getNotFoundView();
@@ -593,54 +600,6 @@
             } catch (error) {
 
               console.error('Error al generar QR de pago:', error);
-
-              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-
-            }
-
-          }
-
-        }, 0);
-
-      }
-
-      
-
-      // Generar QR de cobro
-
-      if (newView === 'genera_qr' && window.qrCobroGenerado) {
-
-        setTimeout(() => {
-
-          const container = document.getElementById('qr-cobro-container');
-
-          if (container && window.montoQRCobro) {
-
-            container.innerHTML = '';
-
-            try {
-
-              new QRCode(container, {
-
-                text: `${userId},${window.montoQRCobro.toFixed(2)}`,
-
-                width: 200,
-
-                height: 200,
-
-                colorDark: "#000000",
-
-                colorLight: "#ffffff",
-
-                correctLevel: QRCode.CorrectLevel.H
-
-              });
-
-              console.log('QR de cobro generado correctamente');
-
-            } catch (error) {
-
-              console.error('Error al generar QR de cobro:', error);
 
               container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
 
@@ -1033,73 +992,318 @@
     }
 
 
-    function getGeneraQRView() {
-
-      return `
-
-        <div class="flex items-center mb-6">
-
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
-          </button>
-
-          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
-
-        </div>
-
-
-        <form onsubmit="generarQRCobro(event)" class="space-y-4">
-
-          <div>
-
-            <label for="monto-cobro" class="block text-sm font-medium text-gray-700">Monto a Cobrar ($)</label>
-
-            <input type="number" id="monto-cobro" placeholder="10.00" required step="0.01" min="0.01"
-
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500">
-
-          </div>
-
-          
-
-          <button type="submit"
-
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-
-            Generar QR de Cobro
-
-          </button>
-
-        </form>
-
-
-        ${window.qrCobroGenerado ? `
-
-          <div class="mt-6 text-center p-4 border-2 border-yellow-400 rounded-lg bg-yellow-50">
-
-            <h3 class="text-lg font-semibold mb-2">QR de Cobro Generado</h3>
-
-            <p class="text-sm text-gray-600 mb-2">Monto: <span class="font-bold">$${window.montoQRCobro?.toFixed(2)}</span></p>
-
-            <div id="qr-cobro-container" class="flex justify-center p-4 bg-white rounded-lg"></div>
-
-            <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagarte.</p>
-
-          </div>
-
-        ` : ''}
-
-      `;
-
-    }
-
-
     function getNotFoundView() {
 
       return `
 
         <div class="text-center p-10">
 
-          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1
+          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
+
+          <p class="text-gray-600">Vista no encontrada.</p>
+
+          <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
+
+            Volver al inicio
+
+          </button>
+
+        </div>
+
+      `;
+
+    }
+        function getGeneraQRView() {
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+        </div>
+
+        <form onsubmit="generarQRCobro(event)" class="space-y-4">
+          <div>
+            <label for="monto-cobro" class="block text-sm font-medium text-gray-700">Monto a Cobrar ($)</label>
+            <input type="number" id="monto-cobro" placeholder="10.00" required step="0.01" min="0.01"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500">
+          </div>
+          
+          <button type="submit"
+                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+            Generar QR de Cobro
+          </button>
+        </form>
+
+        ${window.qrCobroGenerado ? `
+          <div class="mt-6 text-center p-4 border-2 border-yellow-400 rounded-lg bg-yellow-50">
+            <h3 class="text-lg font-semibold mb-2">QR de Cobro Generado</h3>
+            <p class="text-sm text-gray-600 mb-2">Monto: <span class="font-bold">$${window.montoQRCobro?.toFixed(2)}</span></p>
+            <div id="qr-cobro-container" class="flex justify-center p-4 bg-white rounded-lg"></div>
+            <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagarte.</p>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    function getNotFoundView() {
+      return `
+        <div class="text-center p-10">
+          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
+          <p class="text-gray-600">Vista no encontrada.</p>
+          <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
+            Volver al inicio
+          </button>
+        </div>
+      `;
+    }
+
+    window.processPayment = async (event) => {
+
+      event.preventDefault();
+
+      
+
+      // Deshabilitar el botón inmediatamente
+
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+
+      if (submitBtn) {
+
+        submitBtn.disabled = true;
+
+        submitBtn.textContent = "Procesando...";
+
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      }
+
+      
+
+      const receiverId = document.getElementById('negocio-select').value;
+
+      const amount = parseFloat(document.getElementById('monto-pago').value);
+
+
+      if (!receiverId || isNaN(amount) || amount <= 0) {
+
+        showMessage("Selecciona un negocio y un monto válido.", 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+        return;
+
+      }
+
+      if (amount > (userData?.saldo || 0)) {
+
+        showMessage(`Saldo insuficiente. Tu saldo es ${userData.saldo}.`, 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+        return;
+
+      }
+
+
+      const senderRef = db.collection("usuarios").doc(userId);
+
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+
+      const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
+
+      const transaccionRef = db.collection("transacciones").doc();
+
+
+      try {
+
+        const comision = rol === 'negocio' ? amount * 0.05 : 0;
+
+        const montoFinal = amount - comision;
+
+
+        await db.runTransaction(async (t) => {
+
+          const senderDoc = await t.get(senderRef);
+
+          const receiverDoc = await t.get(receiverRef);
+
+          const bancoDoc = await t.get(bancoRef); // Obtener banco
+
+
+          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
+
+
+          const newSenderBalance = senderDoc.data().saldo - amount;
+
+          const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
+
+          const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
+
+
+          t.update(senderRef, { saldo: newSenderBalance });
+
+          t.update(receiverRef, { saldo: newReceiverBalance });
+
+          t.update(bancoRef, { saldo: newBancoBalance }); // Actualizar banco
+
+          t.set(transaccionRef, {
+
+            tipo: "venta",
+
+            emisor: userId,
+
+            receptor: receiverId,
+
+            monto: amount,
+
+            comision: comision,
+
+            fecha: new Date(),
+
+          });
+
+        });
+
+
+        showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
+
+        switchView('home');
+
+      } catch (e) {
+
+        console.error(e);
+
+        showMessage(`Error: ${e}`, 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+      }
+
+    };
+
+
+    // Nueva función para transferencia entre usuarios
+
+   window.processTransfer = async (event) => {
+    event.preventDefault();
+
+    // Obtener la referencia al botón de envío y deshabilitarlo
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Procesando...";
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    const receiverId = document.getElementById('destinatario-id').value.trim();
+    const amount = parseFloat(document.getElementById('monto-transfer').value);
+
+    // Función para rehabilitar el botón en caso de error
+    const reEnableButton = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Confirmar Transferencia";
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    };
+
+    if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
+        showMessage("Ingresa un ID de 4 dígitos y un monto válido.", 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+    if (receiverId === userId) {
+        showMessage("No puedes transferirte dinero a ti mismo.", 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+    if (amount > (userData?.saldo || 0)) {
+        showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+
+    const senderRef = db.collection("usuarios").doc(userId);
+    const receiverRef = db.collection("usuarios").doc(receiverId);
+    const transaccionRef = db.collection("transacciones").doc();
+
+    try {
+        // No hay comisión para transferencias entre usuarios
+        await db.runTransaction(async (t) => {
+            const senderDoc = await t.get(senderRef);
+            const receiverDoc = await t.get(receiverRef);
+
+            if (!senderDoc.exists) throw "Usuario emisor no encontrado";
+            if (!receiverDoc.exists) throw "Usuario destinatario no encontrado";
+
+            // Verificar saldo dentro de la transacción por seguridad adicional
+            if (senderDoc.data().saldo < amount) throw "Saldo insuficiente (Transacción fallida)";
+
+
+            const newSenderBalance = senderDoc.data().saldo - amount;
+            const newReceiverBalance = receiverDoc.data().saldo + amount;
+
+            t.update(senderRef, { saldo: newSenderBalance });
+            t.update(receiverRef, { saldo: newReceiverBalance });
+            t.set(transaccionRef, {
+                tipo: "transferencia",
+                emisor: userId,
+                receptor: receiverId,
+                monto: amount,
+                comision: 0, // ✅ Sin comisión
+                fecha: new Date(),
+            });
+        });
+
+        showMessage(`✅ Transferencia de ${amount} a ${receiverId} exitosa.`, 'success');
+        // El switchView('home') oculta el botón, no necesita rehabilitación explícita
+        switchView('home');
+    } catch (e) {
+        console.error(e);
+        showMessage(`Error: ${e}`, 'error');
+        reEnableButton(); // Rehabilitar botón en caso de error
+    }
+};
+
+
+    // Iniciar renderizado
+
+    if (db) renderApp();
+
+  </script>
+
+
+</body>
+
+</html> 
