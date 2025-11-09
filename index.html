@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <title>Billetera Feria Escolar</title>
   <!-- Carga de Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com  "></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
     .currency-display { font-variant-numeric: tabular-nums; }
@@ -20,11 +20,11 @@
   </div>
 
   <!-- Scripts de Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Librería QRCode.js -->
-  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js  "></script>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
@@ -271,6 +271,55 @@
       currentView = newView;
       message = { text: '', type: '' };
       renderApp();
+      
+      // Generar QR después de que el DOM esté listo
+      if (newView === 'qr') {
+        setTimeout(() => {
+          const container = document.getElementById('qr-code-container');
+          if (container && userId) {
+            container.innerHTML = '';
+            try {
+              new QRCode(container, {
+                text: userId,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+              });
+              console.log('QR generado correctamente');
+            } catch (error) {
+              console.error('Error al generar QR:', error);
+              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
+            }
+          }
+        }, 0);
+      }
+      
+      // Generar QR de pago
+      if (newView === 'qrPago') {
+        setTimeout(() => {
+          const container = document.getElementById('qr-pago-container');
+          if (container && window.tempPagoData) {
+            const { receiverId, amount } = window.tempPagoData;
+            container.innerHTML = '';
+            try {
+              new QRCode(container, {
+                text: `${receiverId},${amount.toFixed(2)}`,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+              });
+              console.log('QR de pago generado correctamente');
+            } catch (error) {
+              console.error('Error al generar QR de pago:', error);
+              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
+            }
+          }
+        }, 0);
+      }
     };
 
     function getHomeView() {
@@ -378,10 +427,6 @@
     }
 
     function getQRView() {
-      const qrContainer = document.createElement("div");
-      new QRCode(qrContainer, userId);
-      const qrCodeHtml = qrContainer.innerHTML;
-
       return `
         <div class="flex items-center mb-6">
           <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
@@ -391,32 +436,28 @@
         </div>
         <div class="text-center p-4">
           <h3 class="text-lg font-semibold">${userData?.nombre || 'Desconocido'}</h3>
-          <p class="text-sm text-gray-500 mb-4">ID: ${userId}</p>
-          <div class="flex justify-center">${qrCodeHtml}</div>
+          <p class="text-sm text-gray-500 mb-4">ID: <span class="font-mono">${userId}</span></p>
+          <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
           <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
         </div>
       `;
     }
 
     function getQRPagoView() {
-        if (!window.tempPagoData) {
-            showMessage("Error: Datos de pago no encontrados.", 'error');
-            switchView('home');
-            return `
-                <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
-                  Error: No se pudo inicializar la vista.
-                </div>
-            `;
-        }
-        const { receiverId, amount } = window.tempPagoData;
-        const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
-        const nombreNegocio = negocio.nombre;
-
-        const qrContainer = document.createElement("div");
-        new QRCode(qrContainer, `${receiverId},${amount.toFixed(2)}`);
-        const qrCodeHtml = qrContainer.innerHTML;
-
+      if (!window.tempPagoData) {
+        showMessage("Error: Datos de pago no encontrados.", 'error');
+        switchView('home');
         return `
+          <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
+            Error: No se pudo inicializar la vista.
+          </div>
+        `;
+      }
+      const { receiverId, amount } = window.tempPagoData;
+      const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
+      const nombreNegocio = negocio.nombre;
+
+      return `
         <div class="flex items-center mb-6">
           <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -427,7 +468,7 @@
           <h3 class="text-lg font-semibold">Pago a: ${nombreNegocio}</h3>
           <p class="text-sm text-gray-500 mb-2">ID: ${receiverId}</p>
           <p class="text-lg font-bold text-indigo-900">Monto: $${amount.toFixed(2)}</p>
-          <div class="flex justify-center">${qrCodeHtml}</div>
+          <div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
           <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagar.</p>
           <button onclick="switchView('home')"
                   class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
@@ -438,7 +479,7 @@
     }
 
     function getTransferView() {
-        return `
+      return `
         <div class="flex items-center mb-6">
           <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -530,7 +571,6 @@
           });
         });
 
-        document.querySelector('#pago form').reset();
         showMessage(`✅ Pago de $${amount} exitoso.`, 'success');
         switchView('home');
       } catch (e) {
@@ -586,8 +626,7 @@
           });
         });
 
-        document.querySelector('#transfer form').reset();
-        showMessage(`✅ Transferencia de $${amount} a ${receiverId} exitosa.`, 'success');
+        showMessage(`✅ Transferencia de ${amount} a ${receiverId} exitosa.`, 'success');
         switchView('home');
       } catch (e) {
         console.error(e);
@@ -599,7 +638,5 @@
     if (db) renderApp();
   </script>
 
-  <!-- QRCode Lib -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode.js/lib/qrcode.min.js  "></script>
 </body>
 </html>
