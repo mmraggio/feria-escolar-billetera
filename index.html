@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+1<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -57,7 +57,8 @@
     // Variables para el escáner QR
     let html5QrCode = null;
     const QR_SCAN_CONTAINER = "reader";
-    window.tempScannedRecipientId = null; // Variable para pasar el ID escaneado
+    window.tempScannedRecipientId = null; // Variable para pasar el ID escaneado en Transferencia
+    window.tempScannedPaymentData = null; // NUEVA Variable para pasar ID y monto escaneados en Pago
 
     // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
@@ -236,14 +237,16 @@
           case 'transfer':
             content = getTransferView();
             break;
-          // **NUEVA VISTA**
           case 'generar_qr_cobro':
             content = getGenerarQRCobroView();
             break;
-          // **NUEVA VISTA DE ESCANEO**
           case 'qrScanTransfer':
             content = getQRScanTransferView();
             break;
+          // NUEVA VISTA PARA ESCANEO DE PAGO
+          case 'qrScanPayment':
+              content = getQRScanPaymentView();
+              break;
           default:
             content = getNotFoundView();
             break;
@@ -350,9 +353,14 @@
             }, 0);
         }
 
-        // Iniciar el scanner
+        // Iniciar el scanner de Transferencia
         if (newView === 'qrScanTransfer') {
             setTimeout(iniciarQRScannerTransfer, 0);
+        }
+
+        // Iniciar el scanner de Pago
+        if (newView === 'qrScanPayment') {
+            setTimeout(iniciarQRScannerPayment, 0);
         }
     }
 
@@ -423,8 +431,20 @@
       const CURRENCY_SYMBOL = '$';
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+      // Obtener y limpiar datos escaneados si existen
+      const scannedData = window.tempScannedPaymentData;
+      let initialReceiverId = '';
+      let initialAmount = '';
+
+      if (scannedData) {
+          initialReceiverId = scannedData.receiverId;
+          initialAmount = scannedData.amount.toFixed(2);
+          window.tempScannedPaymentData = null; // Limpiar después de usar
+      }
+
+
       const negocioOptions = usuarios.length > 0
-        ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
+        ? usuarios.map(n => `<option value="${n.id}" ${n.id === initialReceiverId ? 'selected' : ''}>${n.nombre}</option>`).join('')
         : '<option value="">No hay negocios disponibles</option>';
 
       return `
@@ -439,6 +459,11 @@
           <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
         </div>
         
+        <button type="button" onclick="switchView('qrScanPayment')"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 mb-4">
+            Leer QR de Cobro
+        </button>
+
         <form onsubmit="processPayment(event)" class="space-y-4">
           <div>
             <label for="negocio-select" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
@@ -450,7 +475,7 @@
           </div>
           <div>
             <label for="monto-pago" class="block text-sm font-medium text-gray-700">Monto (${CURRENCY_SYMBOL})</label>
-            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01"
+            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01" value="${initialAmount}"
                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
           </div>
           
@@ -560,7 +585,7 @@
           `;
     }
 
-    // **NUEVA VISTA: Escáner QR para Transferencia**
+    // VISTA DE ESCANEO QR para Transferencia (lee solo ID)
     function getQRScanTransferView() {
         return `
             <div class="flex items-center mb-6">
@@ -575,12 +600,26 @@
         `;
     }
 
-    // **NUEVA FUNCIÓN DE LÓGICA: Iniciar Escáner**
+    // NUEVA VISTA DE ESCANEO QR para Pago (lee ID y Monto)
+    function getQRScanPaymentView() {
+        return `
+            <div class="flex items-center mb-6">
+                <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </button>
+                <h1 class="text-2xl font-bold text-gray-800">Escanear QR de Cobro</h1>
+            </div>
+            <p class="mb-4 text-gray-600 text-sm">Apunta la cámara al código QR de cobro generado por el negocio.</p>
+            <div id="reader" style="width: 100%;"></div>
+            <div id="qr-scan-message" class="mt-4 text-center text-red-600"></div>
+        `;
+    }
+
+    // FUNCIÓN DE LÓGICA: Iniciar Escáner para Transferencia (lee solo ID)
     function iniciarQRScannerTransfer() {
         const messageEl = document.getElementById('qr-scan-message');
         messageEl.textContent = 'Iniciando cámara...';
         
-        // Asegurarse de que no haya un scanner activo
         if (html5QrCode) {
             html5QrCode.stop().catch(err => console.error("Error al detener el scanner:", err));
         }
@@ -589,19 +628,16 @@
 
         const qrCodeSuccessCallback = (decodedText, decodedResult) => {
             
-            // Detener el scanner inmediatamente
             html5QrCode.stop().then(() => {
                 html5QrCode = null;
                 
-                // El QR de un usuario normal solo contiene su ID (4 dígitos)
                 const scannedId = decodedText.trim(); 
                 
                 if (scannedId.match(/^\d{4}$/)) {
-                     // Guardar el ID en la variable temporal y cambiar de vista
                      window.tempScannedRecipientId = scannedId; 
                      switchView('transfer');
                 } else {
-                    messageEl.textContent = `QR inválido o incompleto. Contenido: ${scannedId}`;
+                    messageEl.textContent = `QR inválido. Se esperaba un ID de 4 dígitos. Contenido: ${scannedId}`;
                 }
                 
             }).catch(err => {
@@ -614,8 +650,62 @@
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
         html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, (errorMessage) => {
-            // Se usa "environment" para la cámara trasera.
-            // No mostrar el mensaje de error de forma continua (se llama muchas veces).
+            // No mostrar el mensaje de error de forma continua
+        })
+        .catch((err) => {
+            console.error("Error al iniciar la cámara:", err);
+            messageEl.textContent = `Error al iniciar la cámara. Asegúrate de dar permisos. (${err})`;
+            html5QrCode = null;
+        });
+    }
+
+    // NUEVA FUNCIÓN DE LÓGICA: Iniciar Escáner para Pago (lee ID y Monto)
+    function iniciarQRScannerPayment() {
+        const messageEl = document.getElementById('qr-scan-message');
+        messageEl.textContent = 'Iniciando cámara...';
+        
+        if (html5QrCode) {
+            html5QrCode.stop().catch(err => console.error("Error al detener el scanner:", err));
+        }
+
+        html5QrCode = new Html5Qrcode(QR_SCAN_CONTAINER);
+
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            
+            html5QrCode.stop().then(() => {
+                html5QrCode = null;
+                
+                // Esperamos el formato: IDNegocio,MontoFijo (ej: 0001,150.00)
+                const parts = decodedText.split(',');
+                
+                if (parts.length === 2) {
+                    const receiverId = parts[0].trim();
+                    const amount = parseFloat(parts[1]);
+                    
+                    // Validar ID (4 dígitos) y Monto (> 0)
+                    if (receiverId.match(/^\d{4}$/) && !isNaN(amount) && amount > 0) {
+                         // Guardar los datos en la variable temporal y cambiar de vista
+                         window.tempScannedPaymentData = { receiverId, amount }; 
+                         switchView('pago');
+                    } else {
+                        messageEl.textContent = `QR inválido. ID o monto no cumplen el formato esperado.`;
+                    }
+                    
+                } else {
+                    messageEl.textContent = `QR no reconocido como código de cobro. Formato esperado: ID,Monto.`;
+                }
+                
+            }).catch(err => {
+                console.error("Error al detener el scanner después del éxito:", err);
+                html5QrCode = null;
+                messageEl.textContent = "Error al procesar el QR.";
+            });
+        };
+
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, (errorMessage) => {
+            // No mostrar el mensaje de error de forma continua
         })
         .catch((err) => {
             console.error("Error al iniciar la cámara:", err);
@@ -673,20 +763,17 @@
       `;
     }
 
-    // **NUEVA FUNCIÓN DE LÓGICA**
+    // **FUNCIÓN DE LÓGICA**
     function generarQRCobro() {
         
-      // **Clave:** Tomar el ID del negocio de la variable global 'userId'
       const negocioId = userId; 
       const monto = parseFloat(document.getElementById("monto-cobro").value);
       const cont = document.getElementById("qr-cobro-container");
       const msg = document.getElementById("mensaje");
 
-      // Limpiar contenedores anteriores
       cont.innerHTML = "";
       msg.textContent = "";
       
-      // Opcional: Validar que el rol sea "negocio"
       if (userData?.rol !== 'negocio') {
           msg.textContent = "Error: Solo los negocios pueden generar QR de cobro.";
           msg.className = "mt-4 text-center text-sm text-red-600";
