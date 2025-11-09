@@ -27,8 +27,10 @@
             </div>
 
         <div id="error-message" class="hidden p-6 bg-red-100 text-red-800 rounded-lg mt-8">
-            Hubo un error al cargar los datos.
+            <p class="font-bold">Hubo un error al cargar los datos.</p>
+            <p class="text-sm mt-2">Por favor, revisa la Consola del Navegador (F12) para ver el mensaje de error de Firebase, que podría contener un enlace para crear el índice necesario.</p>
         </div>
+        
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -57,14 +59,24 @@
             } catch (e) {
                 console.error("Error al inicializar Firebase:", e);
                 document.getElementById("loading").classList.add("hidden");
-                document.getElementById("error-message").classList.remove("hidden");
+                // Mostrar el error detallado
+                const errorDiv = document.getElementById("error-message");
+                errorDiv.classList.remove("hidden");
+                errorDiv.innerHTML = `
+                    <p class="font-bold">Error al inicializar Firebase.</p>
+                    <p class="text-sm mt-2">Por favor, revisa la Consola del Navegador (F12) para ver el mensaje de error de Firebase.</p>
+                    <p class="text-xs mt-2 break-all">Detalle: ${e.message || e}</p>
+                `;
             }
         };
 
         async function loadTransactionsView() {
+            const loadingDiv = document.getElementById("loading");
+            const errorDiv = document.getElementById("error-message");
+            const container = document.getElementById('transactions-container');
+            
             try {
-                // 1. Ocultar el mensaje de carga
-                document.getElementById("loading").classList.add("hidden");
+                loadingDiv.classList.add("hidden");
 
                 // 2. Cargar el mapa de usuarios (ID -> Nombre)
                 const usersSnapshot = await db.collection("usuarios").get();
@@ -73,6 +85,7 @@
                 });
                 
                 // 3. Cargar las transacciones, ordenadas por fecha descendente
+                // ESTA ES LA CONSULTA QUE PODRÍA REQUERIR UN ÍNDICE
                 const transactionsSnapshot = await db.collection("transacciones")
                     .orderBy("fecha", "desc")
                     .get();
@@ -86,8 +99,16 @@
                 renderTransactions(transactions);
 
             } catch (e) {
-                console.error("Error al cargar transacciones:", e);
-                document.getElementById("error-message").classList.remove("hidden");
+                console.error("Error al cargar transacciones (posiblemente falta índice):", e);
+                container.classList.add("hidden");
+                
+                // Mostrar el error detallado
+                errorDiv.classList.remove("hidden");
+                errorDiv.innerHTML = `
+                    <p class="font-bold">Error al cargar los datos.</p>
+                    <p class="text-sm mt-2">El problema es casi seguro un **índice de Firestore** faltante. Revisa la Consola (F12) para encontrar el enlace de creación del índice (empieza con **'https://console.firebase.google.com/...'**).</p>
+                    <p class="text-xs mt-2 break-all">Detalle de error: ${e.message || e}</p>
+                `;
             }
         }
 
@@ -112,19 +133,20 @@
             };
 
             let tableHTML = `
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emisor (ID)</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receptor (ID)</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Transado</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Comisión (5%)</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Neto Recibido</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emisor (ID)</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receptor (ID)</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Transado</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Comisión (5%)</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Neto Recibido</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
             `;
 
             transactions.forEach(t => {
@@ -149,8 +171,9 @@
             });
 
             tableHTML += `
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             `;
 
             container.innerHTML = tableHTML;
