@@ -18,6 +18,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
     // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
     const firebaseConfig = {
@@ -52,6 +53,11 @@
     let userData = null;
     let usuarios = []; // Lista de comercios para pagar
     let unsubscribeUsuarios = null;
+
+    // Variables para el escáner QR
+    let html5QrCode = null;
+    const QR_SCAN_CONTAINER = "reader";
+    window.tempScannedRecipientId = null; // Variable para pasar el ID escaneado
 
     // === CARGAR DATOS AL ABRIR ===
     window.onload = () => {
@@ -234,6 +240,10 @@
           case 'generar_qr_cobro':
             content = getGenerarQRCobroView();
             break;
+          // **NUEVA VISTA DE ESCANEO**
+          case 'qrScanTransfer':
+            content = getQRScanTransferView();
+            break;
           default:
             content = getNotFoundView();
             break;
@@ -272,59 +282,79 @@
     };
 
     window.switchView = (newView) => {
-      currentView = newView;
-      message = { text: '', type: '' };
-      renderApp();
-
-      // Generar QR después de que el DOM esté listo
-      if (newView === 'qr') {
-        setTimeout(() => {
-          const container = document.getElementById('qr-code-container');
-          if (container && userId) {
-            container.innerHTML = '';
-            try {
-              new QRCode(container, {
-                text: userId,
-                width: 200,
-                height: 200,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-              });
-              console.log('QR generado correctamente');
-            } catch (error) {
-              console.error('Error al generar QR:', error);
-              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-            }
-          }
-        }, 0);
-      }
-
-      // Generar QR de pago
-      if (newView === 'qrPago') {
-        setTimeout(() => {
-          const container = document.getElementById('qr-pago-container');
-          if (container && window.tempPagoData) {
-            const { receiverId, amount } = window.tempPagoData;
-            container.innerHTML = '';
-            try {
-              new QRCode(container, {
-                text: `${receiverId},${amount.toFixed(2)}`,
-                width: 200,
-                height: 200,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-              });
-              console.log('QR de pago generado correctamente');
-            } catch (error) {
-              console.error('Error al generar QR de pago:', error);
-              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-            }
-          }
-        }, 0);
+      // 1. Detener el scanner si está activo antes de cambiar de vista
+      if (html5QrCode) {
+        // Detener el scanner y luego proceder
+        html5QrCode.stop().catch(err => console.error("Error al detener el scanner:", err)).finally(() => {
+            html5QrCode = null;
+            // Continuar con el cambio de vista solo después de intentar detenerlo
+            performViewSwitch(newView);
+        });
+      } else {
+        performViewSwitch(newView);
       }
     };
+
+    // Función auxiliar para el cambio de vista, separada para manejar el async stop()
+    function performViewSwitch(newView) {
+        currentView = newView;
+        message = { text: '', type: '' };
+        renderApp();
+
+        // Generar QR después de que el DOM esté listo
+        if (newView === 'qr') {
+            setTimeout(() => {
+              const container = document.getElementById('qr-code-container');
+              if (container && userId) {
+                container.innerHTML = '';
+                try {
+                  new QRCode(container, {
+                    text: userId,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                  });
+                  console.log('QR generado correctamente');
+                } catch (error) {
+                  console.error('Error al generar QR:', error);
+                  container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
+                }
+              }
+            }, 0);
+        }
+
+        // Generar QR de pago
+        if (newView === 'qrPago') {
+            setTimeout(() => {
+              const container = document.getElementById('qr-pago-container');
+              if (container && window.tempPagoData) {
+                const { receiverId, amount } = window.tempPagoData;
+                container.innerHTML = '';
+                try {
+                  new QRCode(container, {
+                    text: `${receiverId},${amount.toFixed(2)}`,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                  });
+                  console.log('QR de pago generado correctamente');
+                } catch (error) {
+                  console.error('Error al generar QR de pago:', error);
+                  container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
+                }
+              }
+            }, 0);
+        }
+
+        // Iniciar el scanner
+        if (newView === 'qrScanTransfer') {
+            setTimeout(iniciarQRScannerTransfer, 0);
+        }
+    }
 
     function getHomeView() {
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -485,41 +515,115 @@
     }
 
     function getTransferView() {
-      return `
-        <div class="flex items-center mb-6">
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          </button>
-          <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
-        </div>
+        // Obtener el ID escaneado si existe y limpiarlo
+        const initialRecipientId = window.tempScannedRecipientId || '';
+        if (window.tempScannedRecipientId) {
+            window.tempScannedRecipientId = null; 
+        }
 
-        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
-          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</span></p>
-        </div>
+        return `
+            <div class="flex items-center mb-6">
+              <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+              </button>
+              <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
+            </div>
 
-        <form onsubmit="processTransfer(event)" class="space-y-4">
-          <div>
-            <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario (4 dígitos)</label>
-            <input type="text" id="destinatario-id" placeholder="Ej: 0012" required pattern="[0-9]{4}" maxlength="4"
-                   title="Debe ingresar exactamente 4 dígitos numéricos"
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
-          </div>
-          <div>
-            <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
-            <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
-                   title="Debe ingresar un monto válido mayor a 0"
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
-          </div>
-          
-          <button type="submit"
-                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-            Confirmar Transferencia
-          </button>
-        </form>
-      `;
+            <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+              <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</span></p>
+            </div>
+
+            <form onsubmit="processTransfer(event)" class="space-y-4">
+              <button type="button" onclick="switchView('qrScanTransfer')"
+                      class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+                  Leer QR de Destino
+              </button>
+
+              <div>
+                <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario (4 dígitos)</label>
+                <input type="text" id="destinatario-id" placeholder="Ej: 0012" required pattern="[0-9]{4}" maxlength="4"
+                       title="Debe ingresar exactamente 4 dígitos numéricos" value="${initialRecipientId}"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
+              </div>
+              <div>
+                <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
+                <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
+                       title="Debe ingresar un monto válido mayor a 0"
+                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+              </div>
+              
+              <button type="submit"
+                      class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+                Confirmar Transferencia
+              </button>
+            </form>
+          `;
     }
 
-    // **NUEVA FUNCIÓN DE VISTA**
+    // **NUEVA VISTA: Escáner QR para Transferencia**
+    function getQRScanTransferView() {
+        return `
+            <div class="flex items-center mb-6">
+                <button onclick="switchView('transfer')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </button>
+                <h1 class="text-2xl font-bold text-gray-800">Escanear QR de Destino</h1>
+            </div>
+            <p class="mb-4 text-gray-600 text-sm">Apunta la cámara al QR del usuario al que deseas transferir.</p>
+            <div id="reader" style="width: 100%;"></div>
+            <div id="qr-scan-message" class="mt-4 text-center text-red-600"></div>
+        `;
+    }
+
+    // **NUEVA FUNCIÓN DE LÓGICA: Iniciar Escáner**
+    function iniciarQRScannerTransfer() {
+        const messageEl = document.getElementById('qr-scan-message');
+        messageEl.textContent = 'Iniciando cámara...';
+        
+        // Asegurarse de que no haya un scanner activo
+        if (html5QrCode) {
+            html5QrCode.stop().catch(err => console.error("Error al detener el scanner:", err));
+        }
+
+        html5QrCode = new Html5Qrcode(QR_SCAN_CONTAINER);
+
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            
+            // Detener el scanner inmediatamente
+            html5QrCode.stop().then(() => {
+                html5QrCode = null;
+                
+                // El QR de un usuario normal solo contiene su ID (4 dígitos)
+                const scannedId = decodedText.trim(); 
+                
+                if (scannedId.match(/^\d{4}$/)) {
+                     // Guardar el ID en la variable temporal y cambiar de vista
+                     window.tempScannedRecipientId = scannedId; 
+                     switchView('transfer');
+                } else {
+                    messageEl.textContent = `QR inválido o incompleto. Contenido: ${scannedId}`;
+                }
+                
+            }).catch(err => {
+                console.error("Error al detener el scanner después del éxito:", err);
+                html5QrCode = null;
+                messageEl.textContent = "Error al procesar el QR.";
+            });
+        };
+
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, (errorMessage) => {
+            // Se usa "environment" para la cámara trasera.
+            // No mostrar el mensaje de error de forma continua (se llama muchas veces).
+        })
+        .catch((err) => {
+            console.error("Error al iniciar la cámara:", err);
+            messageEl.textContent = `Error al iniciar la cámara. Asegúrate de dar permisos. (${err})`;
+            html5QrCode = null;
+        });
+    }
+    
     function getGenerarQRCobroView() {
         
         // El ID del negocio que genera el QR se toma directamente de la variable global 'userId'.
