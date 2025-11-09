@@ -372,11 +372,10 @@
 
 
     function getRegistroView() {
+      // MODIFICACIÓN: Se elimina el botón de regresar a 'home' para prevenir errores al intentar
+      // cargar datos no inicializados si el usuario no tiene ID guardado.
       return `
         <div class="flex items-center mb-6">
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          </button>
           <h1 class="text-2xl font-bold text-gray-800">Registrar Usuario</h1>
         </div>
         
@@ -741,9 +740,13 @@
       const transaccionRef = db.collection("transacciones").doc();
 
       try {
-        // Si el emisor (el que paga) es negocio, aplica comisión del 5% al monto total enviado.
-        const comision = rol === 'negocio' ? amount * 0.05 : 0;
-        const montoFinal = amount - comision; // Monto que recibe el negocio
+        // MODIFICACIÓN DE LÓGICA: 
+        // 1. La comisión del 5% se aplica siempre que haya un pago (sin importar el rol del emisor).
+        const comision = amount * 0.05; 
+        
+        // 2. El monto final que recibe el negocio (receptor) es el monto pagado menos la comisión. 
+        // Esto significa que el receptor paga la comisión.
+        const montoFinal = amount - comision; 
 
         await db.runTransaction(async (t) => {
           const senderDoc = await t.get(senderRef);
@@ -752,9 +755,14 @@
 
           if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
 
+          // El emisor paga el monto completo
           const newSenderBalance = senderDoc.data().saldo - amount;
+          
+          // El receptor recibe el monto final (descontada la comisión)
           const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
-          const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
+          
+          // El banco recibe la comisión
+          const newBancoBalance = bancoDoc.data().saldo + comision; 
 
           t.update(senderRef, { saldo: newSenderBalance });
           t.update(receiverRef, { saldo: newReceiverBalance });
@@ -829,7 +837,7 @@
     const transaccionRef = db.collection("transacciones").doc();
 
     try {
-      // No hay comisión para transferencias entre usuarios
+      // No hay comisión para transferencias entre usuarios (se mantiene)
       await db.runTransaction(async (t) => {
         const senderDoc = await t.get(senderRef);
         const receiverDoc = await t.get(receiverRef);
@@ -850,7 +858,7 @@
           emisor: userId,
           receptor: receiverId,
           monto: amount,
-          comision: 0, // ✅ Sin comisión
+          comision: 0, // ✅ Sin comisión (se mantiene)
           fecha: new Date(),
         });
       });
@@ -872,4 +880,3 @@
   </script>
 </body>
 </html>
-9
