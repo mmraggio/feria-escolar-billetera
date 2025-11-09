@@ -1,1285 +1,258 @@
-<!DOCTYPE html>
-
+2<!DOCTYPE html>
 <html lang="es">
 
 <head>
-
   <meta charset="UTF-8" />
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-
   <title>Billetera Feria Escolar</title>
-
-  <script src="https://cdn.tailwindcss.com  "></script>
-
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-
-    body { font-family: 'Inter', sans-serif;
-[cite: 1] }
-
+    body { font-family: 'Inter', sans-serif; }
     .currency-display { font-variant-numeric: tabular-nums; }
-[cite: 2]
-
   </style>
-
 </head>
 
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300"></div>
 
-
-  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300">
-
-    </div>
-
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
-
-
-  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js  "></script>
-
+  <!-- Firebase y QRCode -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <script>
-
-    // === 🔥 CONFIGURACIÓN DE FIREBASE (YA CONFIGURADA) ===
-
+    // ======================================
+    // CONFIGURACIÓN INICIAL
+    // ======================================
     const firebaseConfig = {
-
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
-
-      authDomain: 
-[cite: 3] "feria-escolar-billetera.firebaseapp.com",
-
+      authDomain: "feria-escolar-billetera.firebaseapp.com",
       projectId: "feria-escolar-billetera",
-
       storageBucket: "feria-escolar-billetera.firebasestorage.app",
-
       messagingSenderId: "311026746803",
-
       appId: "1:311026746803:web:fc891c988b9da3faee37c6"
-
     };
-[cite: 4] let db = null;
 
-    let app = null;
-
-
-    // Inicializar Firebase
-
-    try {
-
-      app = firebase.initializeApp(firebaseConfig);
-[cite: 5] db = firebase.firestore();
-
-    } catch (e) {
-
-      console.error("Error al inicializar Firebase:", e);
-[cite: 6] document.getElementById("app-container").innerHTML = `
-
-        <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
-
-          Error: No se pudo inicializar Firebase.
-[cite: 7] Revisa la consola.
-
-        </div>
-
-      `;
-[cite: 8] }
-
-
-    // === VARIABLES GLOBALES ===
+    let app = firebase.initializeApp(firebaseConfig);
+    let db = firebase.firestore();
 
     const BANK_ID = "banco-central";
-[cite: 9] // ID fijo para el banco
-
     let rol = null;
-
     let userId = null;
-[cite: 10] let userData = null;
+    let userData = null;
+    let usuarios = [];
 
-    let usuarios = []; // Lista de comercios para pagar
-
-    let unsubscribeUsuarios = null;
-[cite: 11] // === CARGAR DATOS AL ABRIR ===
-
+    // ======================================
+    // INICIO DE APP
+    // ======================================
     window.onload = () => {
-
-      if (!db) return;
-[cite: 12] // Si Firebase no se inicializó, no hacer nada
-
-
-      // Crear banco si no existe
-
-      setupBanco().then(() => {
-
-        const savedId = localStorage.getItem("userId");
-
-        if (savedId) {
-
-          userId = savedId;
-
-          cargarUsuarioExistente();
-
-        } else {
-
-          mostrarFormulario();
-
-        }
-
-  
-[cite: 13]     }).catch(e => {
-
-        console.error("Error al crear banco:", e);
-
-        showMessage("Error al inicializar banco.", 'error');
-
-      });
-[cite: 14] };
-
-
-    // === CREAR BANCO SI NO EXISTE ===
-
-    async function setupBanco() {
-
-      const bancoRef = db.collection("usuarios").doc(BANK_ID);
-[cite: 15] const doc = await bancoRef.get();
-
-
-      if (!doc.exists) {
-
-        await bancoRef.set({
-
-          nombre: "Banco Nacional",
-
-          rol: "banco",
-
-          saldo: 0, // Saldo inicial
-
-          qrId: BANK_ID,
-
-          createdAt: new Date()
-
-        });
-[cite: 16] console.log("Banco Nacional creado automáticamente.");
-
+      const savedId = localStorage.getItem("userId");
+      if (savedId) {
+        userId = savedId;
+        cargarUsuarioExistente();
+      } else {
+        mostrarFormulario();
       }
+    };
 
+    async function cargarUsuarioExistente() {
+      const doc = await db.collection("usuarios").doc(userId).get();
+      if (doc.exists) {
+        userData = doc.data();
+        rol = userData.rol;
+        switchView('home');
+      } else {
+        localStorage.removeItem("userId");
+        mostrarFormulario();
+      }
     }
-
-
-    function cargarUsuarioExistente() {
-
-      db.collection("usuarios").doc(userId).get().then(doc => {
-
-        if (doc.exists) {
-
-          userData = doc.data();
-
-          rol = userData.rol;
-
-          escucharCambios();
-
-          escucharUsuarios();
-
-          switchView('home');
-
-        } else {
-
-    
-[cite: 17]       alert("Usuario no encontrado. Reinicia la app.");
-
-          localStorage.removeItem("userId");
-
-          mostrarFormulario();
-
-        }
-
-      }).catch(e => {
-
-        console.error("Error al cargar usuario:", e);
-
-        showMessage("Error al cargar usuario.", 'error');
-
-      });
-[cite: 18] }
-
 
     function mostrarFormulario() {
-
-      switchView('registro');
-[cite: 19] }
-
-
-    // === FUNCIÓN CORREGIDA PARA INICIAR USUARIO ===
-
-    async function iniciarUsuario() {
-
-      const btn = document.getElementById("btn-guardar");
-[cite: 20] if (!btn) return;
-
-      btn.disabled = true;
-
-      btn.textContent = "Creando usuario...";
-
-
-      const nombre = document.getElementById("nombre-usuario").value.trim();
-[cite: 21] if (!nombre) {
-
-        alert("Ingresa un nombre");
-
-        btn.disabled = false;
-[cite: 22] btn.textContent = "Guardar y Entrar";
-
-        return;
-
-      }
-
-
-      // Buscar un ID disponible (4 dígitos) de forma síncrona
-
-      let nuevoId = null;
-[cite: 23] let intentos = 0;
-
-
-      while (nuevoId === null && intentos < 10000) {
-
-        intentos++;
-[cite: 24] const id = String(intentos).padStart(4, '0');
-
-        const docRef = db.collection("usuarios").doc(id);
-
-
-        try {
-
-          const doc = await docRef.get();
-[cite: 25] if (!doc.exists) {
-
-            nuevoId = id;
-[cite: 26] await docRef.set({
-
-              nombre,
-
-              rol,
-
-              saldo: rol === 'cliente' ? 500 : 0,
-
-              qrId: id,
-
-              createdAt: new Date()
-
-            });
-[cite: 27] localStorage.setItem("userId", id);
-
-            userId = id;
-
-            userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
-
-            escucharCambios();
-[cite: 28] escucharUsuarios();
-
-            switchView('home');
-
-            break; // Salir del bucle una vez creado
-
-          }
-
-        } catch (e) {
-
-          console.error("Error al crear usuario:", e);
-[cite: 29] alert("Hubo un error al crear el usuario. Inténtalo de nuevo.");
-
-          btn.disabled = false;
-
-          btn.textContent = "Guardar y Entrar";
-
-          return;
-[cite: 30] }
-
-      }
-
-
-      if (!nuevoId) {
-
-        alert("No se pudo asignar un ID. Inténtalo de nuevo.");
-[cite: 31] btn.disabled = false;
-
-        btn.textContent = "Guardar y Entrar";
-
-      }
-
+      currentView = 'registro';
+      renderApp();
     }
 
-
-    function escucharCambios() {
-
-      if (unsubscribeUsuarios) unsubscribeUsuarios();
-[cite: 32] unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
-
-        userData = doc.data();
-
-        // Actualizar vistas que muestran datos del usuario o lista de usuarios
-        if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer' || currentView === 'generar_qr_cobro') renderApp();
-
-      });
-[cite: 33] }
-
-
-    function escucharUsuarios() {
-
-      // Escucha solo negocios
-      db.collection("usuarios").where("rol", "==", "negocio").onSnapshot(snap => {
-
-        usuarios = [];
-
-        snap.forEach(doc => {
-
-          const data = doc.data();
-
-          usuarios.push({ id: doc.id, ...data });
-
-        });
-        // Actualizar vistas que dependen de la lista de usuarios
-   
-[cite: 34]      if (currentView === 'pago' || currentView === 'generar_qr_cobro') renderApp(); // Añadido 'generar_qr_cobro'
-
-      });
-[cite: 35] }
-
-
-    // === VISTAS ===
-
+    // ======================================
+    // GESTIÓN DE VISTAS
+    // ======================================
     let currentView = 'loading';
-[cite: 36] let message = { text: '', type: '' };
 
-
-    const renderApp = () => {
-
+    function renderApp() {
       let content = '';
-[cite: 37] if (currentView === 'loading') {
 
-        content = `
-
-          <div class="flex flex-col items-center justify-center p-10">
-
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-
-            <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando la aplicación...</p>
-
-            <p class="text-sm text-gray-500 mt-2">ID: ${userId ||
-[cite: 38] 'Cargando...'}</p>
-
-          </div>
-
-        `;
-[cite: 39] } else {
-
-        switch (currentView) {
-
-          case 'home':
-
-            content = getHomeView();
-[cite: 40] break;
-
-          case 'registro':
-
-            content = getRegistroView();
-
-            break;
-[cite: 41] case 'pago':
-
-            content = getPagoView();
-
-            break;
-[cite: 42] case 'qr':
-
-            content = getQRView();
-
-            break;
-[cite: 43] case 'qrPago':
-
-            content = getQRPagoView();
-
-            break;
-[cite: 44] case 'transfer':
-
-            content = getTransferView();
-
-            break;
-[cite: 45] case 'generar_qr_cobro': // Nueva vista
-            content = getGenerarQRCobroView();
-            break;
-[cite: 46] default:
-
-            content = getNotFoundView();
-
-            break;
-[cite: 47] }
-
+      switch (currentView) {
+        case 'home': content = getHomeView(); break;
+        case 'qr': content = getQRView(); break;
+        case 'genera_qr': content = getGeneraQRView(); break;
+        case 'genera_qr_pago': content = getGenerarQRPagoView(); break;
+        default:
+          content = `<div class="p-10 text-center text-red-500 font-bold">Vista no encontrada</div>`;
+          break;
       }
-
 
       document.getElementById('app-container').innerHTML = content;
-[cite: 48] // Mostrar mensaje
 
-      if (message.text) {
-
-        const messageElement = document.getElementById('app-message');
-[cite: 49] if (messageElement) {
-
-          const baseClasses = "mt-4 p-3 rounded-lg text-sm font-medium transition-opacity duration-500 ease-in-out";
-[cite: 50] let styleClass = message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-
-          messageElement.className = `${baseClasses} ${styleClass}`;
-
-          messageElement.textContent = message.text;
-[cite: 51] messageElement.style.opacity = 1;
-
-
-          setTimeout(() => {
-
-            message.text = '';
-
-            messageElement.style.opacity = 0;
-
-          }, 4000);
-[cite: 52] }
-
+      // Post-render: asignar acciones
+      if (currentView === 'qr') {
+        const cont = document.getElementById("qr-code-container");
+        if (cont && userId) {
+          cont.innerHTML = "";
+          new QRCode(cont, { text: userId, width: 200, height: 200 });
+        }
       }
 
-      // Lógica específica post-renderizado para vistas que generan QR
-      if (currentView === 'generar_qr_cobro') {
-          // Asegurarse de que el evento click esté atado al botón después de renderizar
-          document.getElementById("btn-generar-qr")?.addEventListener("click", generarQRCobro);
-[cite: 53] }
-    };
+      if (currentView === 'genera_qr') {
+        const btn = document.getElementById("btn-generar-qr");
+        if (btn) btn.onclick = generarQRCobro;
+      }
 
+      if (currentView === 'genera_qr_pago') {
+        const btn = document.getElementById("btn-generar-qr-pago");
+        if (btn) btn.onclick = generarQRPago;
+      }
+    }
 
-    const showMessage = (text, type) => {
-
-      message = { text, type };
-[cite: 54] renderApp();
-
-    };
-
-
-    window.switchView = (newView) => {
-
-      currentView = newView;
-[cite: 55] message = { text: '', type: '' };
-
+    function switchView(view) {
+      currentView = view;
       renderApp();
+    }
 
-      
-      // Generar QR después de que el DOM esté listo
-
-      if (newView === 'qr') {
-
-        setTimeout(() => {
-
-          const container = document.getElementById('qr-code-container');
-
-          if (container && userId) {
-
-            container.innerHTML = '';
-
-            try {
-
-        
-[cite: 56]       new QRCode(container, {
-
-                text: userId,
-
-                width: 200,
-
-                height: 200,
-
-                colorDark: "#000000",
-
-                colorLight: "#ffffff",
-
-       
-[cite: 57]          correctLevel: QRCode.CorrectLevel.H
-
-              });
-
-              console.log('QR generado correctamente');
-
-            } catch (error) {
-
-              console.error('Error al generar QR:', error);
-
-              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-
-       
-[cite: 58]      }
-
-          }
-
-        }, 0);
-[cite: 59] }
-
-      
-      // Generar QR de pago
-
-      if (newView === 'qrPago') {
-
-        setTimeout(() => {
-
-          const container = document.getElementById('qr-pago-container');
-
-          if (container && window.tempPagoData) {
-
-            const { receiverId, amount } = window.tempPagoData;
-
-            container.innerHTML = '';
-
-     
-[cite: 60]        try {
-
-              new QRCode(container, {
-
-                text: `${receiverId},${amount.toFixed(2)}`,
-
-                width: 200,
-
-                height: 200,
-
-                colorDark: "#000000",
-
-        
-[cite: 61]         colorLight: "#ffffff",
-
-                correctLevel: QRCode.CorrectLevel.H
-
-              });
-
-              console.log('QR de pago generado correctamente');
-
-            } catch (error) {
-
-              console.error('Error al generar QR de pago:', error);
-
-       
-[cite: 62]        container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-
-            }
-
-          }
-
-        }, 0);
-[cite: 63] }
-    };
-
+    // ======================================
+    // VISTAS
+    // ======================================
 
     function getHomeView() {
-
-      const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-[cite: 64] const CURRENCY_SYMBOL = '$';
-
-
-      return `
-
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
-
-        
-
-        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
-
-          <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
-
-          <p class="text-4xl font-black text-indigo-900 currency-display">
-
-            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo 
-[cite: 65] || 0)}
-
-          </p>
-
-          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId ||
-[cite: 66] 'N/A'}</span></p>
-
-        </div>
-
-
-        <div class="space-y-4">
-
-          <button onclick="switchView('qr')"
-
-                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-500/50">
-
-            Mi QR
-
-          </button>
-
-          <button onclick="switchView('pago')"
-
-     
-[cite: 67]              class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
-
-            Pagar
-
-          </button>
-
-          <button onclick="switchView('transfer')"
-
-                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold 
-[cite: 68] py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
-
-            Transferir
-
-          </button>
-          <button onclick="switchView('generar_qr_cobro')"
-
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-yellow-500/50">
-
-         
-[cite: 69]    Generar QR Cobro
-
-          </button>
-
-        </div>
-
-        <div id="app-message" style="opacity:0;"
-[cite: 70] class="mt-4 text-center"></div>
-
-      `;
-
-    }
-
-
-    function getRegistroView() {
-
-      return `
-
-        <div class="flex items-center mb-6">
-
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
-          </button>
-
-          <h1 class="text-2xl font-bold text-gray-800">Registrar 
-[cite: 71] Usuario</h1>
-
-        </div>
-
-        
-
-        <div class="space-y-4">
-
-          <button onclick="rol='cliente'; iniciarUsuario()"
-
-                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-
-            Soy Cliente
-
-          </button>
-
-          <button onclick="rol='negocio'; 
-[cite: 72] iniciarUsuario()"
-
-                  class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-
-            Soy Negocio
-
-          </button>
-
-        </div>
-
-        <input type="text" id="nombre-usuario" placeholder="Ingresa tu nombre" class="mt-4 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
-
-        <button id="btn-guardar" onclick="iniciarUsuario()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 
-[cite: 73] rounded-lg shadow-md mt-2">
-
-          Crear Usuario
-
-        </button>
-
-      `;
-[cite: 74] }
-
-
-    function getPagoView() {
-
       const CURRENCY_SYMBOL = '$';
-[cite: 75] const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-[cite: 76] const negocioOptions = usuarios.length > 0
+      const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        ?
-[cite: 77] usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
-
-        : '<option value="">No hay negocios disponibles</option>';
-[cite: 78] return `
-
-        <div class="flex items-center mb-6">
-
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
-          </button>
-
-          <h1 class="text-2xl font-bold text-gray-800">Pagar a Negocio</h1>
-
+      return `
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
+        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
+          <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
+          <p class="text-4xl font-black text-indigo-900 currency-display">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</p>
+          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId}</span></p>
         </div>
 
+        <div class="space-y-4">
+          <button onclick="switchView('qr')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Mi QR</button>
+          <button onclick="switchView('pago')" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Pagar</button>
+          <button onclick="switchView('transfer')" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Transferir</button>
 
-        <div class="p-4 bg-yellow-50 
-[cite: 79] text-yellow-800 rounded-lg mb-4">
-
-          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
-
+          ${rol === 'negocio' ? `
+          <button onclick="switchView('genera_qr')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">Generar QR Cobro</button>
+          <button onclick="switchView('genera_qr_pago')" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">Generar QR Pago</button>
+          ` : ''}
         </div>
-
-        
-
-        <form onsubmit="processPayment(event)" class="space-y-4">
-
-          <div>
-
-            <label for="negocio-select" class="block text-sm font-medium text-gray-700">Seleccionar Negocio</label>
-
-            <select id="negocio-select" required
-
-             
-[cite: 80]        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
-
-              <option value="">-- Selecciona un negocio --</option>
-
-              ${negocioOptions}
-
-            </select>
-
-          </div>
-
-          <div>
-
-            <label for="monto-pago" class="block text-sm font-medium text-gray-700">Monto (${CURRENCY_SYMBOL})</label>
-
- 
-[cite: 81]            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01"
-
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
-
-          </div>
-
-          
-
-          <button type="submit"
-
-                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 
-[cite: 82] px-4 rounded-lg shadow-md transition duration-300">
-
-            Confirmar Pago
-
-          </button>
-
-        </form>
-
       `;
-[cite: 83] }
-
+    }
 
     function getQRView() {
-
       return `
-
         <div class="flex items-center mb-6">
-
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           </button>
-
           <h1 class="text-2xl font-bold text-gray-800">Mi Código QR</h1>
-
-       
-[cite: 84]  </div>
-
-        <div class="text-center p-4">
-
-          <h3 class="text-lg font-semibold">${userData?.nombre ||
-[cite: 85] 'Desconocido'}</h3>
-
-          <p class="text-sm text-gray-500 mb-4">ID: <span class="font-mono">${userId}</span></p>
-
-          <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-
-          <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
-
         </div>
-
+        <div id="qr-code-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
       `;
-[cite: 86] }
-
-
-    function getQRPagoView() {
-
-      if (!window.tempPagoData) {
-
-        showMessage("Error: Datos de pago no encontrados.", 'error');
-[cite: 87] switchView('home');
-
-        return `
-
-          <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
-
-            Error: No se pudo inicializar la vista.
-[cite: 88] </div>
-
-        `;
-
-      }
-
-      const { receiverId, amount } = window.tempPagoData;
-[cite: 89] const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
-
-      const nombreNegocio = negocio.nombre;
-[cite: 90] return `
-
-        <div class="flex items-center mb-6">
-
-          <button onclick="switchView('pago')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
-          </button>
-
-          <h1 class="text-2xl font-bold text-gray-800">QR de Pago</h1>
-
-        </div>
-
-        <div class="text-center p-4">
-
- 
-[cite: 91]          <h3 class="text-lg font-semibold">Pago a: ${nombreNegocio}</h3>
-
-          <p class="text-sm text-gray-500 mb-2">ID: ${receiverId}</p>
-
-          <p class="text-lg font-bold text-indigo-900">Monto: $${amount.toFixed(2)}</p>
-
-          <div id="qr-pago-container" class="flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-
-          <p class="mt-4 text-sm text-gray-600">El cliente debe escanear este código para pagar.</p>
-
-          <button onclick="switchView('home')"
-
-          
-[cite: 92]         class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-
-            Volver al Inicio
-
-          </button>
-
-        </div>
-
-      `;
-[cite: 93] }
-
-
-    function getTransferView() {
-
-      return `
-
-        <div class="flex items-center mb-6">
-
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-
-          </button>
-
-          <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
-
-        
-[cite: 94] </div>
-
-
-        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
-
-          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
-[cite: 95] '0.00'}</span></p>
-
-        </div>
-
-
-        <form onsubmit="processTransfer(event)" class="space-y-4">
-
-          <div>
-
-            <label for="destinatario-id" class="block text-sm font-medium text-gray-700">ID del Destinatario (4 dígitos)</label>
-
-            <input type="text" id="destinatario-id" placeholder="Ej: 0012" required pattern="[0-9]{4}" maxlength="4"
-
-                   title="Debe ingresar exactamente 4 dígitos numéricos"
-
-        
-[cite: 96]            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
-
-          </div>
-
-          <div>
-
-            <label for="monto-transfer" class="block text-sm font-medium text-gray-700">Monto ($)</label>
-
-            <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
-
-                   title="Debe ingresar un monto 
-[cite: 97] válido mayor a 0"
-
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
-
-          </div>
-
-          
-
-          <button type="submit"
-
-                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-
-          
-[cite: 98]   Confirmar Transferencia
-
-          </button>
-
-        </form>
-
-      `;
-[cite: 99] }
-
-    // Nueva vista para generar QR de cobro
-    function getGenerarQRCobroView() {
-        
-        // **MODIFICACIÓN:** Usar userId para identificar al negocio y eliminar el select.
-        const negocioNombre = userData?.nombre || 'Negocio Desconocido';
-        const negocioId = userId;
-        
-[cite: 101] return `
-            <div class="flex items-center mb-6">
-              <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-              </button>
-              <h1 class="text-2xl font-bold text-gray-800">Generar 
-[cite: 102] QR de Cobro</h1>
-            </div>
-
-            <div class="p-4 bg-indigo-100 text-indigo-800 rounded-lg mb-4 text-center">
-                <p class="text-sm font-medium">Generando QR para: <span class="font-bold">${negocioNombre}</span> (ID: <span class="font-mono">${negocioId}</span>)</p>
-            </div>
-            
-            <div id="qr-cobro-container"
-                 class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white min-h-[220px]"></div>
-
-            <div class="space-y-4">
-     
-[cite: 103]          <label for="monto-cobro" class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
-              <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
-                     class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
-              <button id="btn-generar-qr"
-                     
-[cite: 104]  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
-                Generar QR
-              </button>
-            </div>
-
-            <p id="mensaje" class="mt-4 text-center text-sm text-gray-600"></p>
-          `;
-[cite: 105] }
-
-
-    function getNotFoundView() {
-
-      return `
-
-        <div class="text-center p-10">
-
-          <h1 class="text-4xl font-bold text-red-600 mb-4">Error 404</h1>
-
-          <p class="text-gray-600">Vista no encontrada.</p>
-
-          <button onclick="switchView('home')" class="mt-6 text-indigo-600 hover:text-indigo-800 underline">
-
-            Volver al inicio
-
-          </button>
-
-        </div>
-
-  
-[cite: 106]     `;
-
     }
 
+    // Generar QR de cobro
+    function getGeneraQRView() {
+      if (rol !== 'negocio') {
+        alert("Solo los negocios pueden generar QR de cobro.");
+        switchView('home');
+        return '';
+      }
 
-    // Función para manejar la generación del QR en la nueva vista
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+        </div>
+
+        <div id="qr-cobro-container" class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white min-h-[220px]"></div>
+
+        <div class="space-y-4">
+          <label class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
+          <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
+                 class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
+          <button id="btn-generar-qr"
+                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
+            Generar QR
+          </button>
+        </div>
+      `;
+    }
+
     function generarQRCobro() {
-      // **MODIFICACIÓN:** Se utiliza la variable global userId como el ID del negocio
-      const negocioId = userId; 
-[cite: 107] const monto = parseFloat(document.getElementById("monto-cobro").value);
+      const monto = parseFloat(document.getElementById("monto-cobro").value);
       const cont = document.getElementById("qr-cobro-container");
-      const msg = document.getElementById("mensaje");
-[cite: 108] // Limpiar contenedores anteriores
+      cont.innerHTML = "";
+      if (isNaN(monto) || monto <= 0) {
+        alert("Monto inválido.");
+        return;
+      }
+      new QRCode(cont, { text: `${userId},${monto.toFixed(2)}`, width: 200, height: 200 });
+    }
+
+    // Generar QR de pago (nuevo)
+    function getGenerarQRPagoView() {
+      if (rol !== 'negocio') {
+        alert("Solo los negocios pueden generar QR de pago.");
+        switchView('home');
+        return '';
+      }
+
+      return `
+        <div class="flex items-center mb-6">
+          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          </button>
+          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Pago</h1>
+        </div>
+
+        <div id="qr-pago-container" class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white min-h-[220px]"></div>
+
+        <div class="space-y-4">
+          <label class="block text-sm font-medium text-gray-700">Monto a pagar ($)</label>
+          <input type="number" id="monto-pago" placeholder="Ej: 500.00" step="0.01" min="0.01"
+                 class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+          <button id="btn-generar-qr-pago"
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
+            Generar QR
+          </button>
+        </div>
+
+        <p id="mensaje-pago" class="mt-4 text-center text-sm text-gray-600"></p>
+      `;
+    }
+
+    function generarQRPago() {
+      const monto = parseFloat(document.getElementById("monto-pago").value);
+      const cont = document.getElementById("qr-pago-container");
+      const msg = document.getElementById("mensaje-pago");
       cont.innerHTML = "";
       msg.textContent = "";
-[cite: 109] // **MODIFICACIÓN:** La validación se centra en el monto, ya que el negocioId es el userId
-      if (!negocioId || isNaN(monto) || monto <= 0) {
-        msg.textContent = "Ingresa un monto válido para generar el QR de cobro.";
-[cite: 110] msg.className = "mt-4 text-center text-sm text-red-600";
+
+      if (isNaN(monto) || monto <= 0) {
+        msg.textContent = "Ingresá un monto válido.";
+        msg.className = "mt-4 text-center text-sm text-red-600";
         return;
       }
-      
-      // Opcional: Validar que el rol sea "negocio" antes de generar un QR de cobro.
-      if (userData?.rol !== 'negocio') {
-          msg.textContent = "Solo los negocios pueden generar QR de cobro.";
-          msg.className = "mt-4 text-center text-sm text-red-600";
-          return;
-      }
 
-      const qrText = `${negocioId},${monto.toFixed(2)}`;
-[cite: 111] new QRCode(cont, {
-        text: qrText,
-        width: 200,
-        height: 200,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
-[cite: 112] msg.textContent = `QR generado: ${qrText}`;
+      const qrText = `${userId},${monto.toFixed(2)}`;
+      new QRCode(cont, { text: qrText, width: 200, height: 200 });
+      msg.textContent = `QR generado: ${qrText}`;
       msg.className = "mt-4 text-center text-sm text-green-600";
-[cite: 113] }
-
-
-    window.processPayment = async (event) => {
-
-      event.preventDefault();
-[cite: 114] // Deshabilitar el botón inmediatamente
-
-      const submitBtn = event.target.querySelector('button[type="submit"]');
-[cite: 115] if (submitBtn) {
-
-        submitBtn.disabled = true;
-
-        submitBtn.textContent = "Procesando...";
-
-        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-[cite: 116] }
-
-      
-      const receiverId = document.getElementById('negocio-select').value;
-
-      const amount = parseFloat(document.getElementById('monto-pago').value);
-[cite: 117] if (!receiverId || isNaN(amount) || amount <= 0) {
-
-        showMessage("Selecciona un negocio y un monto válido.", 'error');
-[cite: 118] // Rehabilitar botón en caso de error
-
-        if (submitBtn) {
-
-          submitBtn.disabled = false;
-[cite: 119] submitBtn.textContent = "Confirmar Pago";
-
-          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-        }
-
-        return;
-[cite: 120] }
-
-      if (amount > (userData?.saldo || 0)) {
-
-        showMessage(`Saldo insuficiente. Tu saldo es ${userData.saldo}.`, 'error');
-[cite: 121] // Rehabilitar botón en caso de error
-
-        if (submitBtn) {
-
-          submitBtn.disabled = false;
-[cite: 122] submitBtn.textContent = "Confirmar Pago";
-
-          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-        }
-
-        return;
-[cite: 123] }
-
-
-      const senderRef = db.collection("usuarios").doc(userId);
-
-      const receiverRef = db.collection("usuarios").doc(receiverId);
-
-      const bancoRef = db.collection("usuarios").doc(BANK_ID);
-[cite: 124] // Referencia al banco
-
-      const transaccionRef = db.collection("transacciones").doc();
-[cite: 125] try {
-
-        const comision = rol === 'negocio' ?
-[cite: 126] amount * 0.05 : 0;
-
-        const montoFinal = amount - comision;
-[cite: 127] await db.runTransaction(async (t) => {
-
-          const senderDoc = await t.get(senderRef);
-
-          const receiverDoc = await t.get(receiverRef);
-
-          const bancoDoc = await t.get(bancoRef); // Obtener banco
-
-
-          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
-
-
-          const newSenderBalance = senderDoc.data().saldo - amount;
-
-          const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
-
-  
-[cite: 128]         const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
-
-
-          t.update(senderRef, { saldo: newSenderBalance });
-
-          t.update(receiverRef, { saldo: newReceiverBalance });
-
-          t.update(bancoRef, { saldo: newBancoBalance }); // Actualizar banco
-
-          t.set(transaccionRef, {
-
-            tipo: "venta",
-
-            emisor: 
-[cite: 129] userId,
-
-            receptor: receiverId,
-
-            monto: amount,
-
-            comision: comision,
-
-            fecha: new Date(),
-
-          });
-[cite: 130] });
-
-
-        showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
-
-        switchView('home');
-
-      } catch (e) {
-
-        console.error(e);
-[cite: 131] showMessage(`Error: ${e}`, 'error');
-
-        // Rehabilitar botón en caso de error
-
-        if (submitBtn) {
-
-          submitBtn.disabled = false;
-[cite: 132] submitBtn.textContent = "Confirmar Pago";
-
-          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-        }
-
-      }
-
-    };
-[cite: 133] // Nueva función para transferencia entre usuarios
-
-   window.processTransfer = async (event) => {
-    event.preventDefault();
-[cite: 134] // Obtener la referencia al botón de envío y deshabilitarlo
-    const submitBtn = event.target.querySelector('button[type="submit"]');
-[cite: 135] if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Procesando...";
-        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-[cite: 136] }
-
-    const receiverId = document.getElementById('destinatario-id').value.trim();
-    const amount = parseFloat(document.getElementById('monto-transfer').value);
-[cite: 137] // Función para rehabilitar el botón en caso de error
-    const reEnableButton = () => {
-        if (submitBtn) {
-            submitBtn.disabled = false;
-[cite: 138] submitBtn.textContent = "Confirmar Transferencia";
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        }
-    };
-[cite: 139] if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
-        showMessage("Ingresa un ID de 4 dígitos y un monto válido.", 'error');
-[cite: 140] reEnableButton(); // Rehabilitar botón
-        return;
-[cite: 141] }
-    if (receiverId === userId) {
-        showMessage("No puedes transferirte dinero a ti mismo.", 'error');
-[cite: 142] reEnableButton(); // Rehabilitar botón
-        return;
-[cite: 143] }
-    if (amount > (userData?.saldo || 0)) {
-        showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
-[cite: 144] reEnableButton(); // Rehabilitar botón
-        return;
+      document.getElementById("monto-pago").value = "";
     }
 
-    const senderRef = db.collection("usuarios").doc(userId);
-[cite: 145] const receiverRef = db.collection("usuarios").doc(receiverId);
-    const transaccionRef = db.collection("transacciones").doc();
-
-    try {
-        // No hay comisión para transferencias entre usuarios
-        await db.runTransaction(async (t) => {
-            const senderDoc = await t.get(senderRef);
-            const receiverDoc = await t.get(receiverRef);
-
-            if (!senderDoc.exists) throw "Usuario emisor no encontrado";
-            if (!receiverDoc.exists) 
-[cite: 146] throw "Usuario destinatario no encontrado";
-
-            // Verificar saldo dentro de la transacción por seguridad adicional
-            if (senderDoc.data().saldo < amount) throw "Saldo insuficiente (Transacción fallida)";
-
-
-            const newSenderBalance = senderDoc.data().saldo - amount;
-            const newReceiverBalance = receiverDoc.data().saldo + amount;
-
-            t.update(senderRef, { saldo: newSenderBalance });
-     
-[cite: 147]        t.update(receiverRef, { saldo: newReceiverBalance });
-            t.set(transaccionRef, {
-                tipo: "transferencia",
-                emisor: userId,
-                receptor: receiverId,
-                monto: amount,
-        
-[cite: 148]         comision: 0, // ✅ Sin comisión
-                fecha: new Date(),
-            });
-[cite: 149] });
-
-        showMessage(`✅ Transferencia de ${amount} a ${receiverId} exitosa.`, 'success');
-        // El switchView('home') oculta el botón, no necesita rehabilitación explícita
-        switchView('home');
-[cite: 150] } catch (e) {
-        console.error(e);
-        showMessage(`Error: ${e}`, 'error');
-        reEnableButton();
-[cite: 151] // Rehabilitar botón en caso de error
-    }
-};
-
-
-    // Iniciar renderizado
-
-    if (db) renderApp();
-[cite: 152] </script>
-
-
+  </script>
 </body>
-
 </html>
