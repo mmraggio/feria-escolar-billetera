@@ -526,15 +526,35 @@
     window.processPayment = async (event) => {
       event.preventDefault();
       
+      // Deshabilitar el botón inmediatamente
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Procesando...";
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+      
       const receiverId = document.getElementById('negocio-select').value;
       const amount = parseFloat(document.getElementById('monto-pago').value);
 
       if (!receiverId || isNaN(amount) || amount <= 0) {
         showMessage("Selecciona un negocio y un monto válido.", 'error');
+        // Rehabilitar botón en caso de error
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Confirmar Pago";
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
         return;
       }
       if (amount > (userData?.saldo || 0)) {
-        showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
+        showMessage(`Saldo insuficiente. Tu saldo es ${userData.saldo}.`, 'error');
+        // Rehabilitar botón en caso de error
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Confirmar Pago";
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
         return;
       }
 
@@ -571,11 +591,17 @@
           });
         });
 
-        showMessage(`✅ Pago de $${amount} exitoso.`, 'success');
+        showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
         switchView('home');
       } catch (e) {
         console.error(e);
         showMessage(`Error: ${e}`, 'error');
+        // Rehabilitar botón en caso de error
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Confirmar Pago";
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
       }
     };
 
