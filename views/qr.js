@@ -17,38 +17,39 @@ function getQRView() {
       <p class="mt-4 text-sm text-gray-600">Otro usuario puede escanear este código para transferirte dinero.</p>
     </div>
   `;
-
   return html;
 }
 
 // --- Actualización de la vista QR ---
 function updateQRView() {
   if (currentView === 'qr' && userId) {
-    const container = document.getElementById('qr-code-container');
-    const errorDiv = document.getElementById('qr-error-message');
-    
-    if (container) {
+    // Esperar a que el DOM esté listo usando setTimeout
+    setTimeout(() => {
+      const container = document.getElementById('qr-code-container');
+      const errorDiv = document.getElementById('qr-error-message');
+      
+      if (container) {
         container.innerHTML = ''; // Limpiar contenedor
-        errorDiv.classList.add('hidden');
-
+        if (errorDiv) errorDiv.classList.add('hidden');
+        
         try {
-            // Generar QR con la nueva sintaxis
-            new QRCode(container, {
-              text: userId, // Contenido: Solo el ID del usuario
-              width: 200,
-              height: 200,
-              colorDark: "#000000",
-              colorLight: "#ffffff",
-              correctLevel: QRCode.CorrectLevel.H
-            });
-            console.log('QR de ID generado correctamente.');
-
+          // Generar QR con la nueva sintaxis
+          new QRCode(container, {
+            text: userId, // Contenido: Solo el ID del usuario
+            width: 200,
+            height: 200,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+          console.log('QR de ID generado correctamente.');
         } catch (error) {
-            console.error('Error al generar QR de ID:', error);
-            errorDiv.classList.remove('hidden');
+          console.error('Error al generar QR de ID:', error);
+          if (errorDiv) errorDiv.classList.remove('hidden');
         }
-    } else {
-        console.error('Contenedor QR o userId no encontrado en updateQRView.');
-    }
+      } else {
+        console.error('Contenedor QR no encontrado en updateQRView.');
+      }
+    }, 0); // El timeout de 0ms permite que el DOM se actualice primero
   }
 }
