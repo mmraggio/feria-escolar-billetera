@@ -364,9 +364,19 @@
         }
     }
 
+    // === MODIFICACIÓN CLAVE EN getHomeView ===
     function getHomeView() {
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const CURRENCY_SYMBOL = '$';
+
+      // Lógica para mostrar el botón de QR Cobro solo para negocios
+      const qrCobroButton = userData?.rol === 'negocio' ? `
+          <button onclick="switchView('generar_qr_cobro')"
+                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-yellow-500/50">
+            Generar QR Cobro
+          </button>
+      ` : '';
+      // ===========================================
 
       return `
         <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
@@ -392,14 +402,13 @@
                   class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
             Transferir
           </button>
-          <button onclick="switchView('generar_qr_cobro')"
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-yellow-500/50">
-            Generar QR Cobro
-          </button>
+          ${qrCobroButton}
         </div>
         <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
       `;
     }
+    // === FIN DE MODIFICACIÓN ===
+
 
     function getRegistroView() {
       return `
