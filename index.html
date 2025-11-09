@@ -1,123 +1,73 @@
-1<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <title>Billetera Feria Escolar</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generar QR de Cobro</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .currency-display { font-variant-numeric: tabular-nums; }
-  </style>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-  <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300"></div>
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+
+    <div class="flex items-center mb-6">
+      <button onclick="history.back()" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+    </div>
+
+    <!-- Contenedor QR arriba -->
+    <div id="qr-cobro-container"
+         class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white min-h-[220px]"></div>
+
+    <!-- Formulario -->
+    <div class="space-y-4">
+      <label class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
+      <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
+             class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
+      <button id="btn-generar-qr"
+              class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+        Generar QR
+      </button>
+    </div>
+
+    <p id="mensaje" class="mt-4 text-center text-sm text-gray-600"></p>
+  </div>
 
   <script>
-    /* === Tu código original intacto hasta getHomeView() === */
+    const negocioId = "0010"; // 🔹 ID de ejemplo, reemplazá por el real si lo integrás
 
-    function getHomeView() {
-      const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const CURRENCY_SYMBOL = '$';
-
-      return `
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 text-center">Feria Escolar - Billetera</h1>
-
-        <!-- Display de Saldo -->
-        <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
-          <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
-          <p class="text-4xl font-black text-indigo-900 currency-display">
-            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
-          </p>
-          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
-        </div>
-
-        <div class="space-y-4">
-          <button onclick="switchView('qr')"
-                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">
-            Mi QR
-          </button>
-          <button onclick="switchView('pago')"
-                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md">
-            Pagar
-          </button>
-          <button onclick="switchView('transfer')"
-                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
-            Transferir
-          </button>
-          <!-- 🔹 Nuevo botón agregado -->
-          ${rol === 'negocio' ? `
-          <button onclick="switchView('genera_qr')"
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
-            Generar QR de Cobro
-          </button>` : ''}
-        </div>
-        <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
-      `;
-    }
-
-    /* === Tu código original sigue igual === */
-
-    // 🔹 Nueva vista: Generar QR de Cobro (sin modificar nada más)
-    function getGeneraQRView() {
-      if (rol !== 'negocio') { showMessage("Solo los negocios pueden generar QR de cobro.", "error"); switchView('home'); return ""; }
-      return `
-        <div class="flex items-center mb-6">
-          <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-            </svg>
-          </button>
-          <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
-        </div>
-        <div id="qr-cobro-container"
-             class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white"></div>
-        <div class="space-y-4">
-          <label class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
-          <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
-                 class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
-          <button id="btn-generar-qr"
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md">
-            Generar QR
-          </button>
-        </div>`;
-    }
-
-    // 🔹 Generar el QR cuando se ingresa el monto
-    function generarQRCobro() {
+    document.getElementById("btn-generar-qr").addEventListener("click", () => {
       const monto = parseFloat(document.getElementById("monto-cobro").value);
+      const cont = document.getElementById("qr-cobro-container");
+      const msg = document.getElementById("mensaje");
+      cont.innerHTML = "";
+      msg.textContent = "";
+
       if (isNaN(monto) || monto <= 0) {
-        showMessage("Ingresa un monto válido.", "error");
+        msg.textContent = "Ingresá un monto válido.";
+        msg.className = "mt-4 text-center text-sm text-red-600";
         return;
       }
-      window.tempCobroData = { negocioId: userId, monto };
-      switchView("genera_qr");
-    }
 
-    // 🔹 Extensión mínima a switchView() para mostrar el QR generado
-    const originalSwitchView = window.switchView;
-    window.switchView = (newView) => {
-      originalSwitchView(newView);
-      if (newView === 'genera_qr') {
-        setTimeout(() => {
-          const cont = document.getElementById("qr-cobro-container");
-          const btn = document.getElementById("btn-generar-qr");
-          if (btn) btn.onclick = generarQRCobro;
-          if (cont && window.tempCobroData) {
-            const { negocioId, monto } = window.tempCobroData;
-            cont.innerHTML = "";
-            new QRCode(cont, { text: `${negocioId},${monto.toFixed(2)}`, width: 200, height: 200 });
-          }
-        }, 0);
-      }
-    };
+      const qrText = `${negocioId},${monto.toFixed(2)}`;
+      new QRCode(cont, {
+        text: qrText,
+        width: 200,
+        height: 200,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      msg.textContent = `QR generado: ${qrText}`;
+      msg.className = "mt-4 text-center text-sm text-green-600";
+    });
   </script>
 </body>
 </html>
