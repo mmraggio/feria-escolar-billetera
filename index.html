@@ -579,33 +579,46 @@
     }
 
     function generarQRCobro() {
-      const montoField = document.getElementById("monto-cobro");
-      const container = document.getElementById("qr-cobro-container");
+  const montoField = document.getElementById("monto-cobro");
+  const container = document.getElementById("qr-cobro-container");
 
-      if (!container) return;
-      container.innerHTML = "";
+  if (!container) return;
+  container.innerHTML = "";
 
-      const monto = montoField ? parseFloat(montoField.value) : NaN;
-      if (isNaN(monto) || monto <= 0) {
-        showMessage("Ingresa un monto válido.", "error");
-        return;
-      }
+  const monto = montoField ? parseFloat(montoField.value) : NaN;
+  if (isNaN(monto) || monto <= 0) {
+    showMessage("Ingresa un monto válido.", "error");
+    return;
+  }
 
-      try {
-        new QRCode(container, {
-          text: `${userId},${monto.toFixed(2)}`,
-          width: 200,
-          height: 200,
-          colorDark: "#000000",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.H
-        });
-        showMessage("QR generado correctamente.", "success");
-      } catch (error) {
-        console.error("Error al generar QR de cobro:", error);
-        container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
-      }
+  // Guardamos los datos para el QR
+  const qrText = `${userId},${monto.toFixed(2)}`;
+
+  // Generamos el QR después de un pequeño retraso para asegurar que el contenedor esté en el DOM
+  setTimeout(() => {
+    try {
+      new QRCode(container, {
+        text: qrText,
+        width: 200,
+        height: 200,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      // Mostramos debajo el texto con los datos del QR para referencia
+      container.insertAdjacentHTML(
+        "beforeend",
+        `<p class="text-sm text-gray-500 mt-3 font-mono">${qrText}</p>`
+      );
+
+      showMessage("QR generado correctamente.", "success");
+    } catch (error) {
+      console.error("Error al generar QR de cobro:", error);
+      container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
     }
+  }, 50);
+}
 
     window.processPayment = async (event) => {
       event.preventDefault();
