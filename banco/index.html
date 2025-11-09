@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Auditoría de Movimientos - Banco</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .currency-display { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-8">
+    
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 border-b pb-2">🏦 Auditoría de Movimientos (Vista Profesor)</h1>
+            <p class="mt-2 text-gray-600">Detalle completo de todas las transacciones y movimientos entre usuarios.</p>
+        </header>
+
+        <div id="loading" class="text-center p-10">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+            <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando transacciones...</p>
+        </div>
+
+        <div id="transactions-container" class="bg-white shadow-xl rounded-xl overflow-hidden hidden">
+            </div>
+
+        <div id="error-message" class="hidden p-6 bg-red-100 text-red-800 rounded-lg mt-8">
+            Hubo un error al cargar los datos.
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // === 🔥 CONFIGURACIÓN DE FIREBASE (MISMA DE LA APP PRINCIPAL) ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
+            authDomain: "feria-escolar-billetera.firebaseapp.com",
+            projectId: "feria-escolar-billetera",
+            storageBucket: "feria-escolar-billetera.firebasestorage.app",
+            messagingSenderId: "311026746803",
+            appId: "1:311026746803:web:fc891c988b9da3faee37c6"
+        };
+
+        let db = null;
+        let userMap = {}; // Para mapear ID a nombre
+
+        // === FUNCIÓN PRINCIPAL DE CARGA ===
+        window.onload = () => {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                loadTransactionsView();
+            } catch (e) {
+                console.error("Error al inicializar Firebase:", e);
+                document.getElementById("loading").classList.add("hidden");
+                document.getElementById("error-message").classList.remove("hidden");
+            }
+        };
+
+        async function loadTransactionsView() {
+            try {
+                // 1. Ocultar el mensaje de carga
+                document.getElementById("loading").classList.add("hidden");
+
+                // 2. Cargar el mapa de usuarios (ID -> Nombre)
+                const usersSnapshot = await db.collection("usuarios").get();
+                usersSnapshot.forEach(doc => {
+                    userMap[doc.id] = doc.data().nombre;
+                });
+                
+                // 3. Cargar las transacciones, ordenadas por fecha descendente
+                const transactionsSnapshot = await db.collection("transacciones")
+                    .orderBy("fecha", "desc")
+                    .get();
+
+                const transactions = [];
+                transactionsSnapshot.forEach(doc => {
+                    transactions.push(doc.data());
+                });
+
+                // 4. Renderizar la tabla
+                renderTransactions(transactions);
+
+            } catch (e) {
+                console.error("Error al cargar transacciones:", e);
+                document.getElementById("error-message").classList.remove("hidden");
+            }
+        }
+
+        function renderTransactions(transactions) {
+            const container = document.getElementById('transactions-container');
+            if (transactions.length === 0) {
+                container.innerHTML = '<p class="p-6 text-gray-500 text-center">No hay transacciones registradas.</p>';
+                container.classList.remove("hidden");
+                return;
+            }
+
+            const formatCurrency = (value) => value.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const formatDate = (date) => {
+                if (!date || !date.toDate) return 'N/A';
+                return date.toDate().toLocaleString('es-CL', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            let tableHTML = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emisor (ID)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receptor (ID)</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Transado</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Comisión (5%)</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Neto Recibido</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+            `;
+
+            transactions.forEach(t => {
+                const emisorNombre = userMap[t.emisor] || `ID: ${t.emisor}`;
+                const receptorNombre = userMap[t.receptor] || `ID: ${t.receptor}`;
+                const montoRecibido = t.monto - t.comision;
+
+                // Estilo para destacar la fila de la comisión
+                const rowClass = t.comision > 0 ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50';
+                
+                tableHTML += `
+                    <tr class="${rowClass}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(t.fecha)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 capitalize">${t.tipo}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${emisorNombre} <span class="text-xs text-gray-400">(${t.emisor})</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${receptorNombre} <span class="text-xs text-gray-400">(${t.receptor})</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right text-indigo-600">${formatCurrency(t.monto)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${t.comision > 0 ? 'text-red-500 font-bold' : 'text-gray-500'}">${formatCurrency(t.comision)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-right text-green-600">${formatCurrency(montoRecibido)}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = tableHTML;
+            container.classList.remove("hidden");
+        }
+    </script>
+</body>
+</html>
