@@ -1,4 +1,4 @@
-5<!DOCTYPE html>
+6<!DOCTYPE html>
 
 <html lang="es">
 
@@ -12,15 +12,15 @@
 
   <title>Billetera Feria Escolar</title>
 
-  <!-- Carga de Tailwind CSS -->
-
   <script src="https://cdn.tailwindcss.com  "></script>
 
   <style>
 
-    body { font-family: 'Inter', sans-serif; }
+    body { font-family: 'Inter', sans-serif;
+[cite: 1] }
 
     .currency-display { font-variant-numeric: tabular-nums; }
+[cite: 2]
 
   </style>
 
@@ -31,19 +31,13 @@
 
   <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg transition-all duration-300">
 
-    <!-- Contenedor principal de la aplicación -->
+    </div>
 
-  </div>
-
-
-  <!-- Scripts de Firebase -->
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
 
-
-  <!-- Librería QRCode.js -->
 
   <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js  "></script>
 
@@ -56,7 +50,8 @@
 
       apiKey: "AIzaSyDbxqbqjn8ZdCzLUNWyuM2gNMTtVw_-zcI",
 
-      authDomain: "feria-escolar-billetera.firebaseapp.com",
+      authDomain: 
+[cite: 3] "feria-escolar-billetera.firebaseapp.com",
 
       projectId: "feria-escolar-billetera",
 
@@ -67,9 +62,7 @@
       appId: "1:311026746803:web:fc891c988b9da3faee37c6"
 
     };
-
-
-    let db = null;
+[cite: 4] let db = null;
 
     let app = null;
 
@@ -79,46 +72,43 @@
     try {
 
       app = firebase.initializeApp(firebaseConfig);
-
-      db = firebase.firestore();
+[cite: 5] db = firebase.firestore();
 
     } catch (e) {
 
       console.error("Error al inicializar Firebase:", e);
-
-      document.getElementById("app-container").innerHTML = `
+[cite: 6] document.getElementById("app-container").innerHTML = `
 
         <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
 
-          Error: No se pudo inicializar Firebase. Revisa la consola.
+          Error: No se pudo inicializar Firebase.
+[cite: 7] Revisa la consola.
 
         </div>
 
       `;
-
-    }
+[cite: 8] }
 
 
     // === VARIABLES GLOBALES ===
 
-    const BANK_ID = "banco-central"; // ID fijo para el banco
+    const BANK_ID = "banco-central";
+[cite: 9] // ID fijo para el banco
 
     let rol = null;
 
     let userId = null;
-
-    let userData = null;
+[cite: 10] let userData = null;
 
     let usuarios = []; // Lista de comercios para pagar
 
     let unsubscribeUsuarios = null;
-
-
-    // === CARGAR DATOS AL ABRIR ===
+[cite: 11] // === CARGAR DATOS AL ABRIR ===
 
     window.onload = () => {
 
-      if (!db) return; // Si Firebase no se inicializó, no hacer nada
+      if (!db) return;
+[cite: 12] // Si Firebase no se inicializó, no hacer nada
 
 
       // Crear banco si no existe
@@ -139,15 +129,15 @@
 
         }
 
-      }).catch(e => {
+  
+[cite: 13]     }).catch(e => {
 
         console.error("Error al crear banco:", e);
 
         showMessage("Error al inicializar banco.", 'error');
 
       });
-
-    };
+[cite: 14] };
 
 
     // === CREAR BANCO SI NO EXISTE ===
@@ -155,8 +145,7 @@
     async function setupBanco() {
 
       const bancoRef = db.collection("usuarios").doc(BANK_ID);
-
-      const doc = await bancoRef.get();
+[cite: 15] const doc = await bancoRef.get();
 
 
       if (!doc.exists) {
@@ -174,8 +163,7 @@
           createdAt: new Date()
 
         });
-
-        console.log("Banco Nacional creado automáticamente.");
+[cite: 16] console.log("Banco Nacional creado automáticamente.");
 
       }
 
@@ -200,7 +188,8 @@
 
         } else {
 
-          alert("Usuario no encontrado. Reinicia la app.");
+    
+[cite: 17]       alert("Usuario no encontrado. Reinicia la app.");
 
           localStorage.removeItem("userId");
 
@@ -215,15 +204,13 @@
         showMessage("Error al cargar usuario.", 'error');
 
       });
-
-    }
+[cite: 18] }
 
 
     function mostrarFormulario() {
 
       switchView('registro');
-
-    }
+[cite: 19] }
 
 
     // === FUNCIÓN CORREGIDA PARA INICIAR USUARIO ===
@@ -231,8 +218,7 @@
     async function iniciarUsuario() {
 
       const btn = document.getElementById("btn-guardar");
-
-      if (!btn) return;
+[cite: 20] if (!btn) return;
 
       btn.disabled = true;
 
@@ -240,14 +226,12 @@
 
 
       const nombre = document.getElementById("nombre-usuario").value.trim();
-
-      if (!nombre) {
+[cite: 21] if (!nombre) {
 
         alert("Ingresa un nombre");
 
         btn.disabled = false;
-
-        btn.textContent = "Guardar y Entrar";
+[cite: 22] btn.textContent = "Guardar y Entrar";
 
         return;
 
@@ -257,15 +241,13 @@
       // Buscar un ID disponible (4 dígitos) de forma síncrona
 
       let nuevoId = null;
-
-      let intentos = 0;
+[cite: 23] let intentos = 0;
 
 
       while (nuevoId === null && intentos < 10000) {
 
         intentos++;
-
-        const id = String(intentos).padStart(4, '0');
+[cite: 24] const id = String(intentos).padStart(4, '0');
 
         const docRef = db.collection("usuarios").doc(id);
 
@@ -273,13 +255,10 @@
         try {
 
           const doc = await docRef.get();
-
-          if (!doc.exists) {
+[cite: 25] if (!doc.exists) {
 
             nuevoId = id;
-
-
-            await docRef.set({
+[cite: 26] await docRef.set({
 
               nombre,
 
@@ -292,17 +271,14 @@
               createdAt: new Date()
 
             });
-
-
-            localStorage.setItem("userId", id);
+[cite: 27] localStorage.setItem("userId", id);
 
             userId = id;
 
             userData = { nombre, rol, saldo: rol === 'cliente' ? 500 : 0 };
 
             escucharCambios();
-
-            escucharUsuarios();
+[cite: 28] escucharUsuarios();
 
             switchView('home');
 
@@ -313,16 +289,14 @@
         } catch (e) {
 
           console.error("Error al crear usuario:", e);
-
-          alert("Hubo un error al crear el usuario. Inténtalo de nuevo.");
+[cite: 29] alert("Hubo un error al crear el usuario. Inténtalo de nuevo.");
 
           btn.disabled = false;
 
           btn.textContent = "Guardar y Entrar";
 
           return;
-
-        }
+[cite: 30] }
 
       }
 
@@ -330,8 +304,7 @@
       if (!nuevoId) {
 
         alert("No se pudo asignar un ID. Inténtalo de nuevo.");
-
-        btn.disabled = false;
+[cite: 31] btn.disabled = false;
 
         btn.textContent = "Guardar y Entrar";
 
@@ -343,8 +316,7 @@
     function escucharCambios() {
 
       if (unsubscribeUsuarios) unsubscribeUsuarios();
-
-      unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
+[cite: 32] unsubscribeUsuarios = db.collection("usuarios").doc(userId).onSnapshot(doc => {
 
         userData = doc.data();
 
@@ -352,8 +324,7 @@
         if (currentView === 'home' || currentView === 'pago' || currentView === 'transfer' || currentView === 'generar_qr_cobro') renderApp();
 
       });
-
-    }
+[cite: 33] }
 
 
     function escucharUsuarios() {
@@ -371,26 +342,23 @@
 
         });
         // Actualizar vistas que dependen de la lista de usuarios
-        if (currentView === 'pago' || currentView === 'generar_qr_cobro') renderApp(); // Añadido 'generar_qr_cobro'
+   
+[cite: 34]      if (currentView === 'pago' || currentView === 'generar_qr_cobro') renderApp(); // Añadido 'generar_qr_cobro'
 
       });
-
-    }
+[cite: 35] }
 
 
     // === VISTAS ===
 
     let currentView = 'loading';
-
-    let message = { text: '', type: '' };
+[cite: 36] let message = { text: '', type: '' };
 
 
     const renderApp = () => {
 
       let content = '';
-
-
-      if (currentView === 'loading') {
+[cite: 37] if (currentView === 'loading') {
 
         content = `
 
@@ -400,87 +368,74 @@
 
             <p class="mt-4 text-xl font-semibold text-indigo-700">Cargando la aplicación...</p>
 
-            <p class="text-sm text-gray-500 mt-2">ID: ${userId || 'Cargando...'}</p>
+            <p class="text-sm text-gray-500 mt-2">ID: ${userId ||
+[cite: 38] 'Cargando...'}</p>
 
           </div>
 
         `;
-
-      } else {
+[cite: 39] } else {
 
         switch (currentView) {
 
           case 'home':
 
             content = getHomeView();
-
-            break;
+[cite: 40] break;
 
           case 'registro':
 
             content = getRegistroView();
 
             break;
-
-          case 'pago':
+[cite: 41] case 'pago':
 
             content = getPagoView();
 
             break;
-
-          case 'qr':
+[cite: 42] case 'qr':
 
             content = getQRView();
 
             break;
-
-          case 'qrPago':
+[cite: 43] case 'qrPago':
 
             content = getQRPagoView();
 
             break;
-
-          case 'transfer':
+[cite: 44] case 'transfer':
 
             content = getTransferView();
 
             break;
-
-          case 'generar_qr_cobro': // Nueva vista
+[cite: 45] case 'generar_qr_cobro': // Nueva vista
             content = getGenerarQRCobroView();
             break;
-
-          default:
+[cite: 46] default:
 
             content = getNotFoundView();
 
             break;
-
-        }
+[cite: 47] }
 
       }
 
 
       document.getElementById('app-container').innerHTML = content;
-
-
-      // Mostrar mensaje
+[cite: 48] // Mostrar mensaje
 
       if (message.text) {
 
         const messageElement = document.getElementById('app-message');
-
-        if (messageElement) {
+[cite: 49] if (messageElement) {
 
           const baseClasses = "mt-4 p-3 rounded-lg text-sm font-medium transition-opacity duration-500 ease-in-out";
-
-          let styleClass = message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+[cite: 50] let styleClass = message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
           messageElement.className = `${baseClasses} ${styleClass}`;
 
           messageElement.textContent = message.text;
-
-          messageElement.style.opacity = 1;
+[cite: 51] messageElement.style.opacity = 1;
 
 
           setTimeout(() => {
@@ -490,8 +445,7 @@
             messageElement.style.opacity = 0;
 
           }, 4000);
-
-        }
+[cite: 52] }
 
       }
 
@@ -499,15 +453,14 @@
       if (currentView === 'generar_qr_cobro') {
           // Asegurarse de que el evento click esté atado al botón después de renderizar
           document.getElementById("btn-generar-qr")?.addEventListener("click", generarQRCobro);
-      }
+[cite: 53] }
     };
 
 
     const showMessage = (text, type) => {
 
       message = { text, type };
-
-      renderApp();
+[cite: 54] renderApp();
 
     };
 
@@ -515,8 +468,7 @@
     window.switchView = (newView) => {
 
       currentView = newView;
-
-      message = { text: '', type: '' };
+[cite: 55] message = { text: '', type: '' };
 
       renderApp();
 
@@ -535,7 +487,8 @@
 
             try {
 
-              new QRCode(container, {
+        
+[cite: 56]       new QRCode(container, {
 
                 text: userId,
 
@@ -547,7 +500,8 @@
 
                 colorLight: "#ffffff",
 
-                correctLevel: QRCode.CorrectLevel.H
+       
+[cite: 57]          correctLevel: QRCode.CorrectLevel.H
 
               });
 
@@ -559,13 +513,13 @@
 
               container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
 
-            }
+       
+[cite: 58]      }
 
           }
 
         }, 0);
-
-      }
+[cite: 59] }
 
       
       // Generar QR de pago
@@ -582,7 +536,8 @@
 
             container.innerHTML = '';
 
-            try {
+     
+[cite: 60]        try {
 
               new QRCode(container, {
 
@@ -594,7 +549,8 @@
 
                 colorDark: "#000000",
 
-                colorLight: "#ffffff",
+        
+[cite: 61]         colorLight: "#ffffff",
 
                 correctLevel: QRCode.CorrectLevel.H
 
@@ -606,23 +562,22 @@
 
               console.error('Error al generar QR de pago:', error);
 
-              container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
+       
+[cite: 62]        container.innerHTML = '<p class="text-red-500">Error al generar QR</p>';
 
             }
 
           }
 
         }, 0);
-
-      }
+[cite: 63] }
     };
 
 
     function getHomeView() {
 
       const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-      const CURRENCY_SYMBOL = '$';
+[cite: 64] const CURRENCY_SYMBOL = '$';
 
 
       return `
@@ -631,19 +586,19 @@
 
         
 
-        <!-- Display de Saldo -->
-
         <div class="bg-indigo-100 p-4 rounded-xl mb-6 text-center shadow-inner">
 
           <p class="text-sm font-medium text-indigo-700">Tu Saldo (Rol: ${userData?.rol || 'Desconocido'})</p>
 
           <p class="text-4xl font-black text-indigo-900 currency-display">
 
-            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}
+            ${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo 
+[cite: 65] || 0)}
 
           </p>
 
-          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId || 'N/A'}</span></p>
+          <p class="text-xs text-gray-500 mt-2">ID: <span class="font-mono break-all">${userId ||
+[cite: 66] 'N/A'}</span></p>
 
         </div>
 
@@ -660,33 +615,34 @@
 
           <button onclick="switchView('pago')"
 
-                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
+     
+[cite: 67]              class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-green-500/50">
 
             Pagar
 
           </button>
 
-          <!-- Botón de Transferencia entre Usuarios -->
-
           <button onclick="switchView('transfer')"
 
-                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
+                  class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold 
+[cite: 68] py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-500/50">
 
             Transferir
 
           </button>
-          <!-- Botón para nueva vista -->
           <button onclick="switchView('generar_qr_cobro')"
 
                   class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-yellow-500/50">
 
-            Generar QR Cobro
+         
+[cite: 69]    Generar QR Cobro
 
           </button>
 
         </div>
 
-        <div id="app-message" style="opacity:0;" class="mt-4 text-center"></div>
+        <div id="app-message" style="opacity:0;"
+[cite: 70] class="mt-4 text-center"></div>
 
       `;
 
@@ -705,7 +661,8 @@
 
           </button>
 
-          <h1 class="text-2xl font-bold text-gray-800">Registrar Usuario</h1>
+          <h1 class="text-2xl font-bold text-gray-800">Registrar 
+[cite: 71] Usuario</h1>
 
         </div>
 
@@ -721,7 +678,8 @@
 
           </button>
 
-          <button onclick="rol='negocio'; iniciarUsuario()"
+          <button onclick="rol='negocio'; 
+[cite: 72] iniciarUsuario()"
 
                   class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
 
@@ -733,32 +691,28 @@
 
         <input type="text" id="nombre-usuario" placeholder="Ingresa tu nombre" class="mt-4 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
 
-        <button id="btn-guardar" onclick="iniciarUsuario()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md mt-2">
+        <button id="btn-guardar" onclick="iniciarUsuario()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 
+[cite: 73] rounded-lg shadow-md mt-2">
 
           Crear Usuario
 
         </button>
 
       `;
-
-    }
+[cite: 74] }
 
 
     function getPagoView() {
 
       const CURRENCY_SYMBOL = '$';
+[cite: 75] const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+[cite: 76] const negocioOptions = usuarios.length > 0
 
-      const formatCurrency = (value) => value.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-
-      const negocioOptions = usuarios.length > 0
-
-        ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
+        ?
+[cite: 77] usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
 
         : '<option value="">No hay negocios disponibles</option>';
-
-
-      return `
+[cite: 78] return `
 
         <div class="flex items-center mb-6">
 
@@ -773,7 +727,8 @@
         </div>
 
 
-        <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
+        <div class="p-4 bg-yellow-50 
+[cite: 79] text-yellow-800 rounded-lg mb-4">
 
           <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">${CURRENCY_SYMBOL}${formatCurrency(userData?.saldo || 0)}</span></p>
 
@@ -789,7 +744,8 @@
 
             <select id="negocio-select" required
 
-                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
+             
+[cite: 80]        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
 
               <option value="">-- Selecciona un negocio --</option>
 
@@ -803,7 +759,8 @@
 
             <label for="monto-pago" class="block text-sm font-medium text-gray-700">Monto (${CURRENCY_SYMBOL})</label>
 
-            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01"
+ 
+[cite: 81]            <input type="number" id="monto-pago" placeholder="10.00" required step="0.01" min="0.01"
 
                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
 
@@ -813,7 +770,8 @@
 
           <button type="submit"
 
-                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+                  class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 
+[cite: 82] px-4 rounded-lg shadow-md transition duration-300">
 
             Confirmar Pago
 
@@ -822,8 +780,7 @@
         </form>
 
       `;
-
-    }
+[cite: 83] }
 
 
     function getQRView() {
@@ -840,11 +797,13 @@
 
           <h1 class="text-2xl font-bold text-gray-800">Mi Código QR</h1>
 
-        </div>
+       
+[cite: 84]  </div>
 
         <div class="text-center p-4">
 
-          <h3 class="text-lg font-semibold">${userData?.nombre || 'Desconocido'}</h3>
+          <h3 class="text-lg font-semibold">${userData?.nombre ||
+[cite: 85] 'Desconocido'}</h3>
 
           <p class="text-sm text-gray-500 mb-4">ID: <span class="font-mono">${userId}</span></p>
 
@@ -855,8 +814,7 @@
         </div>
 
       `;
-
-    }
+[cite: 86] }
 
 
     function getQRPagoView() {
@@ -864,29 +822,24 @@
       if (!window.tempPagoData) {
 
         showMessage("Error: Datos de pago no encontrados.", 'error');
-
-        switchView('home');
+[cite: 87] switchView('home');
 
         return `
 
           <div class="p-8 text-center bg-red-100 text-red-800 rounded-lg">
 
             Error: No se pudo inicializar la vista.
-
-          </div>
+[cite: 88] </div>
 
         `;
 
       }
 
       const { receiverId, amount } = window.tempPagoData;
-
-      const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
+[cite: 89] const negocio = usuarios.find(u => u.id === receiverId) || { nombre: 'Negocio (ID Desconocido)' };
 
       const nombreNegocio = negocio.nombre;
-
-
-      return `
+[cite: 90] return `
 
         <div class="flex items-center mb-6">
 
@@ -902,7 +855,8 @@
 
         <div class="text-center p-4">
 
-          <h3 class="text-lg font-semibold">Pago a: ${nombreNegocio}</h3>
+ 
+[cite: 91]          <h3 class="text-lg font-semibold">Pago a: ${nombreNegocio}</h3>
 
           <p class="text-sm text-gray-500 mb-2">ID: ${receiverId}</p>
 
@@ -914,7 +868,8 @@
 
           <button onclick="switchView('home')"
 
-                  class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+          
+[cite: 92]         class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
 
             Volver al Inicio
 
@@ -923,8 +878,7 @@
         </div>
 
       `;
-
-    }
+[cite: 93] }
 
 
     function getTransferView() {
@@ -941,12 +895,14 @@
 
           <h1 class="text-2xl font-bold text-gray-800">Transferir Dinero</h1>
 
-        </div>
+        
+[cite: 94] </div>
 
 
         <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg mb-4">
 
-          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</span></p>
+          <p class="text-sm font-medium">Tu Saldo: <span class="font-bold">$${userData?.saldo?.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ||
+[cite: 95] '0.00'}</span></p>
 
         </div>
 
@@ -961,7 +917,8 @@
 
                    title="Debe ingresar exactamente 4 dígitos numéricos"
 
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
+        
+[cite: 96]            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 font-mono focus:ring-green-500 focus:border-green-500">
 
           </div>
 
@@ -971,7 +928,8 @@
 
             <input type="number" id="monto-transfer" placeholder="10.00" required step="0.01" min="0.01"
 
-                   title="Debe ingresar un monto válido mayor a 0"
+                   title="Debe ingresar un monto 
+[cite: 97] válido mayor a 0"
 
                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-green-500 focus:border-green-500">
 
@@ -983,49 +941,54 @@
 
                   class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
 
-            Confirmar Transferencia
+          
+[cite: 98]   Confirmar Transferencia
 
           </button>
 
         </form>
 
       `;
-
-    }
+[cite: 99] }
 
     // Nueva vista para generar QR de cobro
     function getGenerarQRCobroView() {
-        // Opciones para el negocio
-        const negocioOptions = usuarios.length > 0
-            ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
-            : '<option value="">No hay negocios disponibles</option>';
-
-        return `
+        
+        // **MODIFICACIÓN:** Usar userId para identificar al negocio y eliminar el select.
+        const negocioNombre = userData?.nombre || 'Negocio Desconocido';
+        const negocioId = userId;
+        
+[cite: 101] return `
             <div class="flex items-center mb-6">
               <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
               </button>
-              <h1 class="text-2xl font-bold text-gray-800">Generar QR de Cobro</h1>
+              <h1 class="text-2xl font-bold text-gray-800">Generar 
+[cite: 102] QR de Cobro</h1>
             </div>
 
-            <!-- Contenedor QR arriba -->
+            <div class="p-4 bg-indigo-100 text-indigo-800 rounded-lg mb-4 text-center">
+                <p class="text-sm font-medium">Generando QR para: <span class="font-bold">${negocioNombre}</span> (ID: <span class="font-mono">${negocioId}</span>)</p>
+            </div>
+            
             <div id="qr-cobro-container"
                  class="mb-6 flex justify-center p-4 border border-gray-200 rounded-lg bg-white min-h-[220px]"></div>
 
-            <!-- Formulario -->
             <div class="space-y-4">
-              <label class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
+     
+[cite: 103]          <label for="monto-cobro" class="block text-sm font-medium text-gray-700">Monto a cobrar ($)</label>
               <input type="number" id="monto-cobro" placeholder="Ej: 150.00" step="0.01" min="0.01"
                      class="w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
               <button id="btn-generar-qr"
-                      class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
+                     
+[cite: 104]  class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300">
                 Generar QR
               </button>
             </div>
 
             <p id="mensaje" class="mt-4 text-center text-sm text-gray-600"></p>
           `;
-    }
+[cite: 105] }
 
 
     function getNotFoundView() {
@@ -1046,30 +1009,38 @@
 
         </div>
 
-      `;
+  
+[cite: 106]     `;
 
     }
 
 
     // Función para manejar la generación del QR en la nueva vista
     function generarQRCobro() {
-      const negocioId = document.getElementById("negocio-select-qr-cobro").value;
-      const monto = parseFloat(document.getElementById("monto-cobro").value);
+      // **MODIFICACIÓN:** Se utiliza la variable global userId como el ID del negocio
+      const negocioId = userId; 
+[cite: 107] const monto = parseFloat(document.getElementById("monto-cobro").value);
       const cont = document.getElementById("qr-cobro-container");
       const msg = document.getElementById("mensaje");
-
-      // Limpiar contenedores anteriores
+[cite: 108] // Limpiar contenedores anteriores
       cont.innerHTML = "";
       msg.textContent = "";
-
+[cite: 109] // **MODIFICACIÓN:** La validación se centra en el monto, ya que el negocioId es el userId
       if (!negocioId || isNaN(monto) || monto <= 0) {
-        msg.textContent = "Selecciona un negocio y un monto válido.";
-        msg.className = "mt-4 text-center text-sm text-red-600";
+        msg.textContent = "Ingresa un monto válido para generar el QR de cobro.";
+[cite: 110] msg.className = "mt-4 text-center text-sm text-red-600";
         return;
+      }
+      
+      // Opcional: Validar que el rol sea "negocio" antes de generar un QR de cobro.
+      if (userData?.rol !== 'negocio') {
+          msg.textContent = "Solo los negocios pueden generar QR de cobro.";
+          msg.className = "mt-4 text-center text-sm text-red-600";
+          return;
       }
 
       const qrText = `${negocioId},${monto.toFixed(2)}`;
-      new QRCode(cont, {
+[cite: 111] new QRCode(cont, {
         text: qrText,
         width: 200,
         height: 200,
@@ -1077,95 +1048,80 @@
         colorLight: "#ffffff",
         correctLevel: QRCode.CorrectLevel.H
       });
-
-      msg.textContent = `QR generado: ${qrText}`;
+[cite: 112] msg.textContent = `QR generado: ${qrText}`;
       msg.className = "mt-4 text-center text-sm text-green-600";
-    }
+[cite: 113] }
 
 
     window.processPayment = async (event) => {
 
       event.preventDefault();
-
-      
-      // Deshabilitar el botón inmediatamente
+[cite: 114] // Deshabilitar el botón inmediatamente
 
       const submitBtn = event.target.querySelector('button[type="submit"]');
-
-      if (submitBtn) {
+[cite: 115] if (submitBtn) {
 
         submitBtn.disabled = true;
 
         submitBtn.textContent = "Procesando...";
 
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-      }
+[cite: 116] }
 
       
       const receiverId = document.getElementById('negocio-select').value;
 
       const amount = parseFloat(document.getElementById('monto-pago').value);
-
-
-      if (!receiverId || isNaN(amount) || amount <= 0) {
+[cite: 117] if (!receiverId || isNaN(amount) || amount <= 0) {
 
         showMessage("Selecciona un negocio y un monto válido.", 'error');
-
-        // Rehabilitar botón en caso de error
+[cite: 118] // Rehabilitar botón en caso de error
 
         if (submitBtn) {
 
           submitBtn.disabled = false;
-
-          submitBtn.textContent = "Confirmar Pago";
+[cite: 119] submitBtn.textContent = "Confirmar Pago";
 
           submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
         }
 
         return;
-
-      }
+[cite: 120] }
 
       if (amount > (userData?.saldo || 0)) {
 
         showMessage(`Saldo insuficiente. Tu saldo es ${userData.saldo}.`, 'error');
-
-        // Rehabilitar botón en caso de error
+[cite: 121] // Rehabilitar botón en caso de error
 
         if (submitBtn) {
 
           submitBtn.disabled = false;
-
-          submitBtn.textContent = "Confirmar Pago";
+[cite: 122] submitBtn.textContent = "Confirmar Pago";
 
           submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
         }
 
         return;
-
-      }
+[cite: 123] }
 
 
       const senderRef = db.collection("usuarios").doc(userId);
 
       const receiverRef = db.collection("usuarios").doc(receiverId);
 
-      const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
+      const bancoRef = db.collection("usuarios").doc(BANK_ID);
+[cite: 124] // Referencia al banco
 
       const transaccionRef = db.collection("transacciones").doc();
+[cite: 125] try {
 
-
-      try {
-
-        const comision = rol === 'negocio' ? amount * 0.05 : 0;
+        const comision = rol === 'negocio' ?
+[cite: 126] amount * 0.05 : 0;
 
         const montoFinal = amount - comision;
-
-
-        await db.runTransaction(async (t) => {
+[cite: 127] await db.runTransaction(async (t) => {
 
           const senderDoc = await t.get(senderRef);
 
@@ -1181,7 +1137,8 @@
 
           const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
 
-          const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
+  
+[cite: 128]         const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
 
 
           t.update(senderRef, { saldo: newSenderBalance });
@@ -1194,7 +1151,8 @@
 
             tipo: "venta",
 
-            emisor: userId,
+            emisor: 
+[cite: 129] userId,
 
             receptor: receiverId,
 
@@ -1205,8 +1163,7 @@
             fecha: new Date(),
 
           });
-
-        });
+[cite: 130] });
 
 
         showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
@@ -1216,16 +1173,14 @@
       } catch (e) {
 
         console.error(e);
-
-        showMessage(`Error: ${e}`, 'error');
+[cite: 131] showMessage(`Error: ${e}`, 'error');
 
         // Rehabilitar botón en caso de error
 
         if (submitBtn) {
 
           submitBtn.disabled = false;
-
-          submitBtn.textContent = "Confirmar Pago";
+[cite: 132] submitBtn.textContent = "Confirmar Pago";
 
           submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
@@ -1234,51 +1189,46 @@
       }
 
     };
-
-
-    // Nueva función para transferencia entre usuarios
+[cite: 133] // Nueva función para transferencia entre usuarios
 
    window.processTransfer = async (event) => {
     event.preventDefault();
-
-    // Obtener la referencia al botón de envío y deshabilitarlo
+[cite: 134] // Obtener la referencia al botón de envío y deshabilitarlo
     const submitBtn = event.target.querySelector('button[type="submit"]');
-    if (submitBtn) {
+[cite: 135] if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = "Procesando...";
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-    }
+[cite: 136] }
 
     const receiverId = document.getElementById('destinatario-id').value.trim();
     const amount = parseFloat(document.getElementById('monto-transfer').value);
-
-    // Función para rehabilitar el botón en caso de error
+[cite: 137] // Función para rehabilitar el botón en caso de error
     const reEnableButton = () => {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = "Confirmar Transferencia";
+[cite: 138] submitBtn.textContent = "Confirmar Transferencia";
             submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     };
-
-    if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
+[cite: 139] if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
         showMessage("Ingresa un ID de 4 dígitos y un monto válido.", 'error');
-        reEnableButton(); // Rehabilitar botón
+[cite: 140] reEnableButton(); // Rehabilitar botón
         return;
-    }
+[cite: 141] }
     if (receiverId === userId) {
         showMessage("No puedes transferirte dinero a ti mismo.", 'error');
-        reEnableButton(); // Rehabilitar botón
+[cite: 142] reEnableButton(); // Rehabilitar botón
         return;
-    }
+[cite: 143] }
     if (amount > (userData?.saldo || 0)) {
         showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
-        reEnableButton(); // Rehabilitar botón
+[cite: 144] reEnableButton(); // Rehabilitar botón
         return;
     }
 
     const senderRef = db.collection("usuarios").doc(userId);
-    const receiverRef = db.collection("usuarios").doc(receiverId);
+[cite: 145] const receiverRef = db.collection("usuarios").doc(receiverId);
     const transaccionRef = db.collection("transacciones").doc();
 
     try {
@@ -1288,7 +1238,8 @@
             const receiverDoc = await t.get(receiverRef);
 
             if (!senderDoc.exists) throw "Usuario emisor no encontrado";
-            if (!receiverDoc.exists) throw "Usuario destinatario no encontrado";
+            if (!receiverDoc.exists) 
+[cite: 146] throw "Usuario destinatario no encontrado";
 
             // Verificar saldo dentro de la transacción por seguridad adicional
             if (senderDoc.data().saldo < amount) throw "Saldo insuficiente (Transacción fallida)";
@@ -1298,24 +1249,27 @@
             const newReceiverBalance = receiverDoc.data().saldo + amount;
 
             t.update(senderRef, { saldo: newSenderBalance });
-            t.update(receiverRef, { saldo: newReceiverBalance });
+     
+[cite: 147]        t.update(receiverRef, { saldo: newReceiverBalance });
             t.set(transaccionRef, {
                 tipo: "transferencia",
                 emisor: userId,
                 receptor: receiverId,
                 monto: amount,
-                comision: 0, // ✅ Sin comisión
+        
+[cite: 148]         comision: 0, // ✅ Sin comisión
                 fecha: new Date(),
             });
-        });
+[cite: 149] });
 
         showMessage(`✅ Transferencia de ${amount} a ${receiverId} exitosa.`, 'success');
         // El switchView('home') oculta el botón, no necesita rehabilitación explícita
         switchView('home');
-    } catch (e) {
+[cite: 150] } catch (e) {
         console.error(e);
         showMessage(`Error: ${e}`, 'error');
-        reEnableButton(); // Rehabilitar botón en caso de error
+        reEnableButton();
+[cite: 151] // Rehabilitar botón en caso de error
     }
 };
 
@@ -1323,8 +1277,7 @@
     // Iniciar renderizado
 
     if (db) renderApp();
-
-  </script>
+[cite: 152] </script>
 
 
 </body>
