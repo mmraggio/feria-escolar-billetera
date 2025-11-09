@@ -1,4 +1,4 @@
-4<!DOCTYPE html>
+5<!DOCTYPE html>
 
 <html lang="es">
 
@@ -14,7 +14,7 @@
 
   <!-- Carga de Tailwind CSS -->
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com  "></script>
 
   <style>
 
@@ -38,14 +38,14 @@
 
   <!-- Scripts de Firebase -->
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js  "></script>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js  "></script>
 
 
   <!-- Librería QRCode.js -->
 
-  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js  "></script>
 
 
   <script>
@@ -371,7 +371,7 @@
 
         });
         // Actualizar vistas que dependen de la lista de usuarios
-        if (currentView === 'pago') renderApp();
+        if (currentView === 'pago' || currentView === 'generar_qr_cobro') renderApp(); // Añadido 'generar_qr_cobro'
 
       });
 
@@ -446,7 +446,7 @@
 
             break;
 
-          case 'generar_qr_cobro':
+          case 'generar_qr_cobro': // Nueva vista
             content = getGenerarQRCobroView();
             break;
 
@@ -497,6 +497,7 @@
 
       // Lógica específica post-renderizado para vistas que generan QR
       if (currentView === 'generar_qr_cobro') {
+          // Asegurarse de que el evento click esté atado al botón después de renderizar
           document.getElementById("btn-generar-qr")?.addEventListener("click", generarQRCobro);
       }
     };
@@ -994,6 +995,11 @@
 
     // Nueva vista para generar QR de cobro
     function getGenerarQRCobroView() {
+        // Opciones para el negocio
+        const negocioOptions = usuarios.length > 0
+            ? usuarios.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('')
+            : '<option value="">No hay negocios disponibles</option>';
+
         return `
             <div class="flex items-center mb-6">
               <button onclick="switchView('home')" class="text-indigo-600 hover:text-indigo-800 mr-4 transition duration-200">
@@ -1047,6 +1053,7 @@
 
     // Función para manejar la generación del QR en la nueva vista
     function generarQRCobro() {
+      const negocioId = document.getElementById("negocio-select-qr-cobro").value;
       const monto = parseFloat(document.getElementById("monto-cobro").value);
       const cont = document.getElementById("qr-cobro-container");
       const msg = document.getElementById("mensaje");
@@ -1055,14 +1062,13 @@
       cont.innerHTML = "";
       msg.textContent = "";
 
-      if (isNaN(monto) || monto <= 0) {
-        msg.textContent = "Ingresa un monto válido.";
+      if (!negocioId || isNaN(monto) || monto <= 0) {
+        msg.textContent = "Selecciona un negocio y un monto válido.";
         msg.className = "mt-4 text-center text-sm text-red-600";
         return;
       }
 
-      // Usar el ID del usuario actual (negocio que genera el QR)
-      const qrText = `${userId},${monto.toFixed(2)}`;
+      const qrText = `${negocioId},${monto.toFixed(2)}`;
       new QRCode(cont, {
         text: qrText,
         width: 200,
@@ -1072,6 +1078,255 @@
         correctLevel: QRCode.CorrectLevel.H
       });
 
-      msg.textContent = `QR generado para cobrar ${monto.toFixed(2)}`;
+      msg.textContent = `QR generado: ${qrText}`;
       msg.className = "mt-4 text-center text-sm text-green-600";
     }
+
+
+    window.processPayment = async (event) => {
+
+      event.preventDefault();
+
+      
+      // Deshabilitar el botón inmediatamente
+
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+
+      if (submitBtn) {
+
+        submitBtn.disabled = true;
+
+        submitBtn.textContent = "Procesando...";
+
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      }
+
+      
+      const receiverId = document.getElementById('negocio-select').value;
+
+      const amount = parseFloat(document.getElementById('monto-pago').value);
+
+
+      if (!receiverId || isNaN(amount) || amount <= 0) {
+
+        showMessage("Selecciona un negocio y un monto válido.", 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+        return;
+
+      }
+
+      if (amount > (userData?.saldo || 0)) {
+
+        showMessage(`Saldo insuficiente. Tu saldo es ${userData.saldo}.`, 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+        return;
+
+      }
+
+
+      const senderRef = db.collection("usuarios").doc(userId);
+
+      const receiverRef = db.collection("usuarios").doc(receiverId);
+
+      const bancoRef = db.collection("usuarios").doc(BANK_ID); // Referencia al banco
+
+      const transaccionRef = db.collection("transacciones").doc();
+
+
+      try {
+
+        const comision = rol === 'negocio' ? amount * 0.05 : 0;
+
+        const montoFinal = amount - comision;
+
+
+        await db.runTransaction(async (t) => {
+
+          const senderDoc = await t.get(senderRef);
+
+          const receiverDoc = await t.get(receiverRef);
+
+          const bancoDoc = await t.get(bancoRef); // Obtener banco
+
+
+          if (!senderDoc.exists || !receiverDoc.exists || !bancoDoc.exists) throw "Usuario no encontrado";
+
+
+          const newSenderBalance = senderDoc.data().saldo - amount;
+
+          const newReceiverBalance = receiverDoc.data().saldo + montoFinal;
+
+          const newBancoBalance = bancoDoc.data().saldo + comision; // Sumar comisión al banco
+
+
+          t.update(senderRef, { saldo: newSenderBalance });
+
+          t.update(receiverRef, { saldo: newReceiverBalance });
+
+          t.update(bancoRef, { saldo: newBancoBalance }); // Actualizar banco
+
+          t.set(transaccionRef, {
+
+            tipo: "venta",
+
+            emisor: userId,
+
+            receptor: receiverId,
+
+            monto: amount,
+
+            comision: comision,
+
+            fecha: new Date(),
+
+          });
+
+        });
+
+
+        showMessage(`✅ Pago de ${amount} exitoso.`, 'success');
+
+        switchView('home');
+
+      } catch (e) {
+
+        console.error(e);
+
+        showMessage(`Error: ${e}`, 'error');
+
+        // Rehabilitar botón en caso de error
+
+        if (submitBtn) {
+
+          submitBtn.disabled = false;
+
+          submitBtn.textContent = "Confirmar Pago";
+
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        }
+
+      }
+
+    };
+
+
+    // Nueva función para transferencia entre usuarios
+
+   window.processTransfer = async (event) => {
+    event.preventDefault();
+
+    // Obtener la referencia al botón de envío y deshabilitarlo
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Procesando...";
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    const receiverId = document.getElementById('destinatario-id').value.trim();
+    const amount = parseFloat(document.getElementById('monto-transfer').value);
+
+    // Función para rehabilitar el botón en caso de error
+    const reEnableButton = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Confirmar Transferencia";
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    };
+
+    if (!receiverId || isNaN(amount) || amount <= 0 || !receiverId.match(/^\d{4}$/)) {
+        showMessage("Ingresa un ID de 4 dígitos y un monto válido.", 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+    if (receiverId === userId) {
+        showMessage("No puedes transferirte dinero a ti mismo.", 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+    if (amount > (userData?.saldo || 0)) {
+        showMessage(`Saldo insuficiente. Tu saldo es $${userData.saldo}.`, 'error');
+        reEnableButton(); // Rehabilitar botón
+        return;
+    }
+
+    const senderRef = db.collection("usuarios").doc(userId);
+    const receiverRef = db.collection("usuarios").doc(receiverId);
+    const transaccionRef = db.collection("transacciones").doc();
+
+    try {
+        // No hay comisión para transferencias entre usuarios
+        await db.runTransaction(async (t) => {
+            const senderDoc = await t.get(senderRef);
+            const receiverDoc = await t.get(receiverRef);
+
+            if (!senderDoc.exists) throw "Usuario emisor no encontrado";
+            if (!receiverDoc.exists) throw "Usuario destinatario no encontrado";
+
+            // Verificar saldo dentro de la transacción por seguridad adicional
+            if (senderDoc.data().saldo < amount) throw "Saldo insuficiente (Transacción fallida)";
+
+
+            const newSenderBalance = senderDoc.data().saldo - amount;
+            const newReceiverBalance = receiverDoc.data().saldo + amount;
+
+            t.update(senderRef, { saldo: newSenderBalance });
+            t.update(receiverRef, { saldo: newReceiverBalance });
+            t.set(transaccionRef, {
+                tipo: "transferencia",
+                emisor: userId,
+                receptor: receiverId,
+                monto: amount,
+                comision: 0, // ✅ Sin comisión
+                fecha: new Date(),
+            });
+        });
+
+        showMessage(`✅ Transferencia de ${amount} a ${receiverId} exitosa.`, 'success');
+        // El switchView('home') oculta el botón, no necesita rehabilitación explícita
+        switchView('home');
+    } catch (e) {
+        console.error(e);
+        showMessage(`Error: ${e}`, 'error');
+        reEnableButton(); // Rehabilitar botón en caso de error
+    }
+};
+
+
+    // Iniciar renderizado
+
+    if (db) renderApp();
+
+  </script>
+
+
+</body>
+
+</html>
